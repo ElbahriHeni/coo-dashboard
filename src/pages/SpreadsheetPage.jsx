@@ -9,6 +9,7 @@ import {
 } from '../utils/opportunityImport';
 
 const PAGE_SIZE = 200;
+const STATIC_WORKBOOK_URL = '/data/AllOppQDR.xlsx';
 
 const formatFileSize = (size) => {
   if (size < 1024) return `${size} B`;
@@ -39,11 +40,54 @@ const getExportRows = (rows) =>
     }, {})
   );
 
+const buildWorkbookData = (workbook, fileName, fileSize) => {
+  const sheets = workbook.SheetNames.map((name) => {
+    const worksheet = workbook.Sheets[name];
+    const rawRows = XLSX.utils.sheet_to_json(worksheet, {
+      defval: '',
+      raw: false,
+    });
+
+    const headerMap = Object.fromEntries(
+      Object.keys(rawRows[0] ?? {}).map((header) => [normalizeHeader(header), header])
+    );
+
+    const matchedColumns = OPPORTUNITY_COLUMNS.filter(
+      (column) => headerMap[normalizeHeader(column)]
+    );
+
+    const rows = rawRows.map((row) =>
+      OPPORTUNITY_COLUMNS.reduce((acc, column) => {
+        const sourceKey = headerMap[normalizeHeader(column)];
+        const value = sourceKey ? row[sourceKey] : '';
+        acc[column] =
+          column === 'UsrQuoteSubmissionDate' ? normalizeDashboardDate(value) : value;
+        return acc;
+      }, {})
+    );
+
+    return {
+      name,
+      rowCount: rows.length,
+      matchedColumns,
+      rows,
+    };
+  });
+
+  return {
+    fileName,
+    fileSize,
+    sheetCount: sheets.length,
+    sheets,
+  };
+};
+
 export default function SpreadsheetPage() {
   const inputId = useId();
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [isAutoLoading, setIsAutoLoading] = useState(false);
   const [workbookData, setWorkbookData] = useState(() => loadOpportunityImport()?.workbookData ?? null);
   const [activeSheet, setActiveSheet] = useState(() => loadOpportunityImport()?.activeSheet ?? '');
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,13 +96,16 @@ export default function SpreadsheetPage() {
     if (!workbookData || !activeSheet) return null;
     return workbookData.sheets.find((sheet) => sheet.name === activeSheet) ?? null;
   }, [activeSheet, workbookData]);
+
   const totalRows = sheetPreview?.rows.length ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+
   const visibleRows = useMemo(() => {
     if (!sheetPreview) return [];
     const startIndex = (currentPage - 1) * PAGE_SIZE;
     return sheetPreview.rows.slice(startIndex, startIndex + PAGE_SIZE);
   }, [currentPage, sheetPreview]);
+
   const startRow = totalRows === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const endRow = Math.min(currentPage * PAGE_SIZE, totalRows);
 
@@ -81,6 +128,39 @@ export default function SpreadsheetPage() {
     });
   }, [activeSheet, workbookData]);
 
+  useEffect(() => {
+    if (workbookData) return;
+
+    const autoLoadWorkbook = async () => {
+      try {
+        setIsAutoLoading(true);
+        setUploadError('');
+
+        const response = await fetch(STATIC_WORKBOOK_URL, { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('Static workbook not found');
+        }
+
+        const buffer = await response.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const builtWorkbookData = buildWorkbookData(workbook, 'AllOppQDR.xlsx', buffer.byteLength);
+        const firstUsableSheet =
+          builtWorkbookData.sheets.find((sheet) => sheet.matchedColumns.length > 0) ??
+          builtWorkbookData.sheets[0] ??
+          null;
+
+        setWorkbookData(builtWorkbookData);
+        setActiveSheet(firstUsableSheet?.name ?? '');
+      } catch (error) {
+        setUploadError('The deployed workbook could not be loaded automatically.');
+      } finally {
+        setIsAutoLoading(false);
+      }
+    };
+
+    autoLoadWorkbook();
+  }, [workbookData]);
+
   const loadWorkbook = async (file) => {
     if (!file) return;
 
@@ -96,46 +176,14 @@ export default function SpreadsheetPage() {
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
-
-      const sheets = workbook.SheetNames.map((name) => {
-        const worksheet = workbook.Sheets[name];
-        const rawRows = XLSX.utils.sheet_to_json(worksheet, {
-          defval: '',
-          raw: false,
-        });
-        const headerMap = Object.fromEntries(
-          Object.keys(rawRows[0] ?? {}).map((header) => [normalizeHeader(header), header])
-        );
-        const matchedColumns = OPPORTUNITY_COLUMNS.filter(
-          (column) => headerMap[normalizeHeader(column)]
-        );
-        const rows = rawRows.map((row) =>
-          OPPORTUNITY_COLUMNS.reduce((acc, column) => {
-            const sourceKey = headerMap[normalizeHeader(column)];
-            const value = sourceKey ? row[sourceKey] : '';
-            acc[column] =
-              column === 'UsrQuoteSubmissionDate' ? normalizeDashboardDate(value) : value;
-            return acc;
-          }, {})
-        );
-
-        return {
-          name,
-          rowCount: rows.length,
-          matchedColumns,
-          rows,
-        };
-      });
+      const builtWorkbookData = buildWorkbookData(workbook, file.name, file.size);
 
       const firstUsableSheet =
-        sheets.find((sheet) => sheet.matchedColumns.length > 0) ?? sheets[0] ?? null;
+        builtWorkbookData.sheets.find((sheet) => sheet.matchedColumns.length > 0) ??
+        builtWorkbookData.sheets[0] ??
+        null;
 
-      setWorkbookData({
-        fileName: file.name,
-        fileSize: file.size,
-        sheetCount: sheets.length,
-        sheets,
-      });
+      setWorkbookData(builtWorkbookData);
       setActiveSheet(firstUsableSheet?.name ?? '');
       setUploadError('');
     } catch (error) {
@@ -197,8 +245,7 @@ export default function SpreadsheetPage() {
           <p className="eyebrow uploader-eyebrow">Excel Import</p>
           <h2>Load opportunities from XLSX</h2>
           <p className="subtitle uploader-subtitle">
-            Drop a workbook here or browse for one. This page reads the file locally and maps it
-            into the dashboard opportunity fields.
+            This page now auto-loads the deployed workbook and maps it into the dashboard opportunity fields.
           </p>
         </div>
 
@@ -212,7 +259,7 @@ export default function SpreadsheetPage() {
             onChange={onInputChange}
           />
           <label htmlFor={inputId} className="primary-button">
-            Choose XLSX File
+            Replace with another XLSX
           </label>
           <button
             type="button"
@@ -223,6 +270,7 @@ export default function SpreadsheetPage() {
           </button>
         </div>
 
+        {isAutoLoading ? <p className="meta-label">Loading deployed workbook...</p> : null}
         {uploadError ? <p className="upload-error">{uploadError}</p> : null}
       </div>
 
@@ -307,7 +355,7 @@ export default function SpreadsheetPage() {
           {sheetPreview && sheetPreview.matchedColumns.length === 0 ? (
             <p className="upload-error">
               This sheet does not contain the expected `Usr...` headers yet. Select another sheet or
-              upload a workbook with those columns.
+              replace the workbook with one that contains those columns.
             </p>
           ) : null}
 
@@ -338,8 +386,8 @@ export default function SpreadsheetPage() {
         <div className="card empty-state-card">
           <h3>Ready for your workbook</h3>
           <p>
-            Once you upload a file, this page will map the workbook into the opportunity columns and
-            show the imported rows in a scrollable table.
+            The page will try to load the deployed workbook automatically. You can still replace it
+            with another file if needed.
           </p>
         </div>
       )}
