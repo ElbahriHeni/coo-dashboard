@@ -1,0 +1,48 @@
+export const records = [
+  { id: 1, month: 'Jan', lob: 'Motor', region: 'CRO', source: 'Banca', department: 'Sales', status: 'New', quotations: 120, convertedPolicies: 26, expectedGwp: 520000, actualGwp: 165000, durationBucket: '< 1 day', phase: 'Lead' },
+  { id: 2, month: 'Jan', lob: 'Motor', region: 'WRO', source: 'Direct', department: 'UW', status: 'Pending UW', quotations: 95, convertedPolicies: 18, expectedGwp: 430000, actualGwp: 124000, durationBucket: '1-3 days', phase: 'Quoted' },
+  { id: 3, month: 'Jan', lob: 'Medical', region: 'ERO', source: 'Salesperson', department: 'Reinsurance', status: 'Returned', quotations: 80, convertedPolicies: 10, expectedGwp: 210000, actualGwp: 81000, durationBucket: '4-7 days', phase: 'UW Review' },
+  { id: 4, month: 'Jan', lob: 'General', region: 'CRO', source: 'Banca', department: 'Risk Engineer', status: 'Approved', quotations: 55, convertedPolicies: 14, expectedGwp: 190000, actualGwp: 97000, durationBucket: '1-3 days', phase: 'Approved' },
+  { id: 5, month: 'Jan', lob: 'Life', region: 'ERO', source: 'BRM', department: 'Doctor', status: 'Converted', quotations: 40, convertedPolicies: 12, expectedGwp: 160000, actualGwp: 132000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+  { id: 6, month: 'Feb', lob: 'Motor', region: 'CRO', source: 'Salesperson', department: 'AML', status: 'Rejected', quotations: 135, convertedPolicies: 22, expectedGwp: 610000, actualGwp: 152000, durationBucket: '> 7 days', phase: 'UW Review' },
+  { id: 7, month: 'Feb', lob: 'Motor', region: 'ERO', source: 'Banca', department: 'Finance', status: 'Approved', quotations: 102, convertedPolicies: 25, expectedGwp: 490000, actualGwp: 174000, durationBucket: '1-3 days', phase: 'Approved' },
+  { id: 8, month: 'Feb', lob: 'Medical', region: 'WRO', source: 'Direct', department: 'Policy Admin', status: 'Pending UW', quotations: 78, convertedPolicies: 9, expectedGwp: 240000, actualGwp: 69000, durationBucket: '4-7 days', phase: 'Quoted' },
+  { id: 9, month: 'Feb', lob: 'General', region: 'CRO', source: 'Salesperson', department: 'Sales', status: 'New', quotations: 68, convertedPolicies: 15, expectedGwp: 220000, actualGwp: 110000, durationBucket: '< 1 day', phase: 'Lead' },
+  { id: 10, month: 'Feb', lob: 'Life', region: 'WRO', source: 'Banca', department: 'UW', status: 'Converted', quotations: 42, convertedPolicies: 13, expectedGwp: 175000, actualGwp: 144000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+  { id: 11, month: 'Mar', lob: 'Motor', region: 'CRO', source: 'Banca', department: 'Reinsurance', status: 'Pending UW', quotations: 144, convertedPolicies: 31, expectedGwp: 700000, actualGwp: 240000, durationBucket: '1-3 days', phase: 'Quoted' },
+  { id: 12, month: 'Mar', lob: 'Motor', region: 'WRO', source: 'Direct', department: 'Risk Engineer', status: 'Returned', quotations: 110, convertedPolicies: 19, expectedGwp: 480000, actualGwp: 138000, durationBucket: '4-7 days', phase: 'UW Review' },
+  { id: 13, month: 'Mar', lob: 'Medical', region: 'ERO', source: 'Salesperson', department: 'Doctor', status: 'Approved', quotations: 88, convertedPolicies: 18, expectedGwp: 275000, actualGwp: 135000, durationBucket: '1-3 days', phase: 'Approved' },
+  { id: 14, month: 'Mar', lob: 'General', region: 'ERO', source: 'Banca', department: 'AML', status: 'Rejected', quotations: 61, convertedPolicies: 11, expectedGwp: 205000, actualGwp: 92000, durationBucket: '> 7 days', phase: 'Quoted' },
+  { id: 15, month: 'Mar', lob: 'Life', region: 'CRO', source: 'BRM', department: 'Finance', status: 'Converted', quotations: 39, convertedPolicies: 12, expectedGwp: 155000, actualGwp: 128000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+  { id: 16, month: 'Apr', lob: 'Motor', region: 'CRO', source: 'Banca', department: 'Policy Admin', status: 'Approved', quotations: 150, convertedPolicies: 37, expectedGwp: 760000, actualGwp: 288000, durationBucket: '1-3 days', phase: 'Approved' },
+  { id: 17, month: 'Apr', lob: 'Motor', region: 'ERO', source: 'Direct', department: 'Sales', status: 'Converted', quotations: 118, convertedPolicies: 35, expectedGwp: 590000, actualGwp: 302000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+  { id: 18, month: 'Apr', lob: 'Medical', region: 'WRO', source: 'Banca', department: 'UW', status: 'New', quotations: 92, convertedPolicies: 16, expectedGwp: 310000, actualGwp: 118000, durationBucket: '4-7 days', phase: 'Lead' },
+  { id: 19, month: 'Apr', lob: 'General', region: 'CRO', source: 'Salesperson', department: 'Reinsurance', status: 'Pending UW', quotations: 73, convertedPolicies: 14, expectedGwp: 235000, actualGwp: 121000, durationBucket: '1-3 days', phase: 'UW Review' },
+  { id: 20, month: 'Apr', lob: 'Life', region: 'ERO', source: 'BRM', department: 'Risk Engineer', status: 'Converted', quotations: 47, convertedPolicies: 15, expectedGwp: 182000, actualGwp: 151000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+  { id: 21, month: 'May', lob: 'Motor', region: 'CRO', source: 'Salesperson', department: 'Doctor', status: 'New', quotations: 160, convertedPolicies: 40, expectedGwp: 840000, actualGwp: 320000, durationBucket: '< 1 day', phase: 'Lead' },
+  { id: 22, month: 'May', lob: 'Motor', region: 'WRO', source: 'Banca', department: 'AML', status: 'Pending UW', quotations: 126, convertedPolicies: 29, expectedGwp: 610000, actualGwp: 244000, durationBucket: '1-3 days', phase: 'Quoted' },
+  { id: 23, month: 'May', lob: 'Medical', region: 'ERO', source: 'Direct', department: 'Finance', status: 'Approved', quotations: 96, convertedPolicies: 19, expectedGwp: 325000, actualGwp: 140000, durationBucket: '4-7 days', phase: 'Approved' },
+  { id: 24, month: 'May', lob: 'General', region: 'CRO', source: 'Banca', department: 'Policy Admin', status: 'Returned', quotations: 76, convertedPolicies: 13, expectedGwp: 248000, actualGwp: 109000, durationBucket: '> 7 days', phase: 'UW Review' },
+  { id: 25, month: 'May', lob: 'Life', region: 'WRO', source: 'BRM', department: 'Sales', status: 'Converted', quotations: 49, convertedPolicies: 16, expectedGwp: 194000, actualGwp: 162000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+  { id: 26, month: 'Jun', lob: 'Motor', region: 'CRO', source: 'Banca', department: 'UW', status: 'Converted', quotations: 172, convertedPolicies: 44, expectedGwp: 900000, actualGwp: 375000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+  { id: 27, month: 'Jun', lob: 'Motor', region: 'ERO', source: 'Direct', department: 'Reinsurance', status: 'Approved', quotations: 130, convertedPolicies: 32, expectedGwp: 650000, actualGwp: 261000, durationBucket: '1-3 days', phase: 'Approved' },
+  { id: 28, month: 'Jun', lob: 'Medical', region: 'WRO', source: 'Salesperson', department: 'Risk Engineer', status: 'Pending UW', quotations: 104, convertedPolicies: 21, expectedGwp: 348000, actualGwp: 149000, durationBucket: '4-7 days', phase: 'Quoted' },
+  { id: 29, month: 'Jun', lob: 'General', region: 'ERO', source: 'Banca', department: 'Doctor', status: 'Rejected', quotations: 82, convertedPolicies: 15, expectedGwp: 265000, actualGwp: 118000, durationBucket: '> 7 days', phase: 'Quoted' },
+  { id: 30, month: 'Jun', lob: 'Life', region: 'CRO', source: 'BRM', department: 'AML', status: 'Converted', quotations: 53, convertedPolicies: 17, expectedGwp: 205000, actualGwp: 169000, durationBucket: '< 1 day', phase: 'Pending Issuance' },
+];
+
+export const targets = {
+  quotations: 3200,
+  policies: 760,
+  conversionRate: 24,
+  expectedGwpMotor: 6500000,
+  actualGwp: 2900000,
+};
+
+export const filterOptions = {
+  months: ['All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+  lobs: ['All', 'Motor', 'Medical', 'General', 'Life'],
+  regions: ['All', 'CRO', 'ERO', 'WRO'],
+  sources: ['All', 'Banca', 'Direct', 'Salesperson', 'BRM'],
+  departments: ['All', 'Sales', 'UW', 'Reinsurance', 'Risk Engineer', 'Doctor', 'AML', 'Finance', 'Policy Admin'],
+};
