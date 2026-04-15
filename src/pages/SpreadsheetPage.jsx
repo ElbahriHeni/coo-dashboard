@@ -97,8 +97,11 @@ export default function SpreadsheetPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [isAutoLoading, setIsAutoLoading] = useState(false);
-  const [workbookData, setWorkbookData] = useState(() => loadOpportunityImport()?.workbookData ?? null);
-  const [activeSheet, setActiveSheet] = useState(() => loadOpportunityImport()?.activeSheet ?? '');
+
+  const savedImport = loadOpportunityImport();
+
+  const [workbookData, setWorkbookData] = useState(() => savedImport?.workbookData ?? null);
+  const [activeSheet, setActiveSheet] = useState(() => savedImport?.activeSheet ?? '');
   const [currentPage, setCurrentPage] = useState(1);
 
   const sheetPreview = useMemo(() => {
@@ -138,14 +141,20 @@ export default function SpreadsheetPage() {
   }, [activeSheet, workbookData]);
 
   useEffect(() => {
-    if (workbookData) return;
-
     const autoLoadWorkbook = async () => {
       try {
         setIsAutoLoading(true);
         setUploadError('');
 
-        const response = await fetch(STATIC_WORKBOOK_URL, { cache: 'no-store' });
+        const cacheBustedUrl = `${STATIC_WORKBOOK_URL}?t=${Date.now()}`;
+        const response = await fetch(cacheBustedUrl, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+        });
+
         if (!response.ok) {
           throw new Error('Static workbook not found');
         }
@@ -153,6 +162,7 @@ export default function SpreadsheetPage() {
         const buffer = await response.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         const builtWorkbookData = buildWorkbookData(workbook, 'AllOppQDR.xlsx', buffer.byteLength);
+
         const firstUsableSheet =
           builtWorkbookData.sheets.find((sheet) => sheet.matchedColumns.length > 0) ??
           builtWorkbookData.sheets[0] ??
@@ -168,7 +178,7 @@ export default function SpreadsheetPage() {
     };
 
     autoLoadWorkbook();
-  }, [workbookData]);
+  }, []);
 
   const loadWorkbook = async (file) => {
     if (!file) return;
