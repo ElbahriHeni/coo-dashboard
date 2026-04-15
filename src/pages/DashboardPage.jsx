@@ -91,10 +91,25 @@ const parseNumber = (value) => {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
 
-  const normalized = String(value).replace(/,/g, '').trim();
+  const raw = String(value).trim();
+
+  if (!raw) return 0;
+
+  const timeMatch = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (timeMatch) {
+    const minutes = Number(timeMatch[1]);
+    const seconds = Number(timeMatch[2]);
+
+    if (Number.isFinite(minutes) && Number.isFinite(seconds)) {
+      return minutes + seconds / 60;
+    }
+  }
+
+  const normalized = raw.replace(/,/g, '');
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
 
 const normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();
 
