@@ -630,18 +630,26 @@ export default function DashboardPage() {
     return Object.values(grouped).sort((a, b) => b.quotation - a.quotation);
   }, [filteredImportedRows]);
 
-  const gwpComparisonBySource = useMemo(() => {
-    return Object.values(
-      filteredRecords.reduce((acc, item) => {
-        if (!acc[item.source]) {
-          acc[item.source] = { name: item.source, actual: 0, target: 0 };
-        }
-        acc[item.source].actual += item.actualGwp;
-        acc[item.source].target += item.expectedGwp;
-        return acc;
-      }, {})
-    );
-  }, [filteredRecords]);
+  const gwpBySourceQuotationVsPolicies = useMemo(() => {
+    const grouped = filteredImportedRows.reduce((acc, row) => {
+      const source = String(row.UsrSource ?? '').trim() || 'Blank';
+
+      if (!acc[source]) {
+        acc[source] = { name: source, quotation: 0, policies: 0 };
+      }
+
+      const amount = parseAmount(row.UsrQuotationAmount);
+      acc[source].quotation += amount;
+
+      if (POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus))) {
+        acc[source].policies += amount;
+      }
+
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => b.quotation - a.quotation);
+  }, [filteredImportedRows]);
 
   return (
     <>
@@ -819,21 +827,21 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="GWP by Source: Actual vs Target">
+        <ChartCard title="GWP by Source: Quotations vs Policies">
           <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpComparisonBySource} barGap={10}>
+            <BarChart data={gwpBySourceQuotationVsPolicies} barGap={10}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
               <Legend />
               <Tooltip
                 formatter={(value, name) => [
-                  `SAR ${value.toLocaleString()}`,
-                  name === 'actual' ? 'Actual GWP' : 'Target GWP',
+                  `SAR ${Number(value).toLocaleString()}`,
+                  name === 'quotation' ? 'Quotation GWP' : 'Policies GWP',
                 ]}
               />
-              <Bar dataKey="actual" name="Actual GWP" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="target" name="Target GWP" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="quotation" name="Quotation GWP" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="policies" name="Policies GWP" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
