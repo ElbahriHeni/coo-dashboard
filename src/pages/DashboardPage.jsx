@@ -48,20 +48,8 @@ const POLICY_GWP_STATUSES = new Set([
   'complete',
 ]);
 
-const QUOTATION_TAT_GROUPS = [
-  'Sales',
-  'CRC',
-  'UW',
-  'Reinsurance',
-  'Risk engineer',
-  'Doctor',
-];
-
-const POLICY_TAT_GROUPS = [
-  'AML',
-  'Finance',
-  'Policy Admin',
-];
+const QUOTATION_TAT_GROUPS = ['Sales', 'UW', 'Reinsurance', 'Risk engineer', 'Doctor'];
+const POLICY_TAT_GROUPS = ['AML', 'Finance', 'Policy Admin'];
 
 function groupBy(recordsList, key, valueSelector) {
   return Object.entries(
@@ -110,7 +98,7 @@ const parseNumber = (value) => {
 
 const normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();
 
-const normalizeGroupName = (value) => {
+const normalizeAssignToGroup = (value) => {
   const raw = String(value ?? '').trim().toLowerCase();
 
   if (!raw) return '';
@@ -126,6 +114,20 @@ const normalizeGroupName = (value) => {
   if (raw === 'policy admin' || raw === 'policyadmin') return 'Policy Admin';
 
   return String(value ?? '').trim();
+};
+
+const normalizeAssignedByRoleForQuotationTat = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase();
+
+  if (!raw) return '';
+
+  if (raw.includes('corporate sales')) return 'Sales';
+  if (raw.includes('underwriting')) return 'UW';
+  if (raw.includes('reinsurance') || raw.includes('reinusrance')) return 'Reinsurance';
+  if (raw.includes('risk engineer') || raw.includes('riskengineer')) return 'Risk engineer';
+  if (raw.includes('doctor')) return 'Doctor';
+
+  return '';
 };
 
 const normalizeClasseurDate = (value) => {
@@ -163,13 +165,45 @@ const normalizeClasseurDate = (value) => {
   return `${year}-${month}-${day.padStart(2, '0')}`;
 };
 
-const buildTatDataset = (rows, groups) => {
+const buildQuotationTatDataset = (rows, groups) => {
   return groups.map((groupName) => {
     const groupRows = rows.filter(
-      (row) => normalizeGroupName(row.UsrAssignToGroup) === groupName
+      (row) => normalizeAssignedByRoleForQuotationTat(row.UsrAssignedByRole) === groupName
+    );
+
+    const rowsWithRequestId = groupRows.filter(
+      (row) => String(row.UsrRequestNoId ?? '').trim() !== ''
+    );
+
+    const count = rowsWithRequestId.length;
+
+    const avgDays =
+      count === 0
+        ? 0
+        : rowsWithRequestId.reduce((acc, row) => acc + parseNumber(row.UsrTurnaroundDays), 0) / count;
+
+    const avgMinutes =
+      count === 0
+        ? 0
+        : rowsWithRequestId.reduce((acc, row) => acc + parseNumber(row.UsrTurnaroundTime), 0) / count;
+
+    return {
+      name: groupName,
+      count,
+      avgDays: Number(avgDays.toFixed(2)),
+      avgMinutes: Number(avgMinutes.toFixed(2)),
+    };
+  });
+};
+
+const buildPolicyTatDataset = (rows, groups) => {
+  return groups.map((groupName) => {
+    const groupRows = rows.filter(
+      (row) => normalizeAssignToGroup(row.UsrAssignToGroup) === groupName
     );
 
     const count = groupRows.length;
+
     const avgDays =
       count === 0
         ? 0
@@ -382,11 +416,11 @@ export default function DashboardPage() {
   }, [classeurRows, filters.businesses, filters.fromDate, filters.toDate]);
 
   const quotationsTatByDepartment = useMemo(() => {
-    return buildTatDataset(filteredClasseurRows, QUOTATION_TAT_GROUPS);
+    return buildQuotationTatDataset(filteredClasseurRows, QUOTATION_TAT_GROUPS);
   }, [filteredClasseurRows]);
 
   const policiesTatByDepartment = useMemo(() => {
-    return buildTatDataset(filteredClasseurRows, POLICY_TAT_GROUPS);
+    return buildPolicyTatDataset(filteredClasseurRows, POLICY_TAT_GROUPS);
   }, [filteredClasseurRows]);
 
   const quotationsCount = useMemo(() => filteredImportedRows.length, [filteredImportedRows]);
@@ -650,29 +684,6 @@ export default function DashboardPage() {
         <ChartCard title="Policies Converted by Duration">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={durationBuckets}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Quotations TAT Coverage">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart
-              data={[
-                {
-                  name: 'Quotations',
-                  value: quotationsTatByDepartment.reduce((acc, item) => acc + item.count, 0),
-                },
-                {
-                  name: 'Policies',
-                  value: policiesTatByDepartment.reduce((acc, item) => acc + item.count, 0),
-                },
-              ]}
-            >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
