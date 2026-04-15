@@ -30,22 +30,20 @@ const formatOpportunityCellValue = (header, value) => {
     return formatCellValue(normalizeDashboardDate(value));
   }
 
-  if (header === BUSINESS_MAPPING_COLUMN) {
-    const mapping = getMappedBusinessFromUsrClass(value);
-    return mapping.display;
-  }
-
   return formatCellValue(value);
 };
 
 const getExportRows = (rows) =>
-  rows.map((row) =>
-    OPPORTUNITY_COLUMNS.reduce((acc, header) => {
+  rows.map((row) => {
+    const exportRow = OPPORTUNITY_COLUMNS.reduce((acc, header) => {
       acc[header] =
         header === 'UsrQuoteSubmissionDate' ? normalizeDashboardDate(row[header]) : row[header] ?? '';
       return acc;
-    }, {})
-  );
+    }, {});
+
+    exportRow[BUSINESS_MAPPING_COLUMN] = row[BUSINESS_MAPPING_COLUMN] ?? '';
+    return exportRow;
+  });
 
 const buildWorkbookData = (workbook, fileName, fileSize) => {
   const sheets = workbook.SheetNames.map((name) => {
@@ -63,15 +61,19 @@ const buildWorkbookData = (workbook, fileName, fileSize) => {
       (column) => headerMap[normalizeHeader(column)]
     );
 
-    const rows = rawRows.map((row) =>
-      OPPORTUNITY_COLUMNS.reduce((acc, column) => {
+    const rows = rawRows.map((row) => {
+      const mappedRow = OPPORTUNITY_COLUMNS.reduce((acc, column) => {
         const sourceKey = headerMap[normalizeHeader(column)];
         const value = sourceKey ? row[sourceKey] : '';
         acc[column] =
           column === 'UsrQuoteSubmissionDate' ? normalizeDashboardDate(value) : value;
         return acc;
-      }, {})
-    );
+      }, {});
+
+      mappedRow[BUSINESS_MAPPING_COLUMN] = getMappedBusinessFromUsrClass(mappedRow.UsrClass).business;
+
+      return mappedRow;
+    });
 
     return {
       name,
@@ -218,7 +220,7 @@ export default function SpreadsheetPage() {
 
     const exportWorkbook = XLSX.utils.book_new();
     const exportSheet = XLSX.utils.json_to_sheet(getExportRows(sheetPreview.rows), {
-      header: OPPORTUNITY_COLUMNS,
+      header: [...OPPORTUNITY_COLUMNS, BUSINESS_MAPPING_COLUMN],
     });
 
     XLSX.utils.book_append_sheet(exportWorkbook, exportSheet, sheetPreview.name || 'Opportunities');
@@ -252,8 +254,8 @@ export default function SpreadsheetPage() {
           <p className="eyebrow uploader-eyebrow">Excel Import</p>
           <h2>Load opportunities from XLSX</h2>
           <p className="subtitle uploader-subtitle">
-            This page auto-loads the deployed workbook, maps it into the dashboard fields, and shows
-            a business mapping check based on UsrClass.
+            This page auto-loads the deployed workbook, maps it into the dashboard fields, and stores
+            the computed business mapping for downstream dashboard filters.
           </p>
         </div>
 
@@ -378,18 +380,22 @@ export default function SpreadsheetPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map((row, rowIndex) => (
-                  <tr key={`${sheetPreview?.name}-${startRow + rowIndex}`}>
-                    {OPPORTUNITY_COLUMNS.map((header) => (
-                      <td key={`${header}-${startRow + rowIndex}`}>
-                        {formatOpportunityCellValue(header, row[header])}
+                {visibleRows.map((row, rowIndex) => {
+                  const mapping = getMappedBusinessFromUsrClass(row.UsrClass);
+
+                  return (
+                    <tr key={`${sheetPreview?.name}-${startRow + rowIndex}`}>
+                      {OPPORTUNITY_COLUMNS.map((header) => (
+                        <td key={`${header}-${startRow + rowIndex}`}>
+                          {formatOpportunityCellValue(header, row[header])}
+                        </td>
+                      ))}
+                      <td key={`${BUSINESS_MAPPING_COLUMN}-${startRow + rowIndex}`}>
+                        {row[BUSINESS_MAPPING_COLUMN] || mapping.display}
                       </td>
-                    ))}
-                    <td key={`${BUSINESS_MAPPING_COLUMN}-${startRow + rowIndex}`}>
-                      {getMappedBusinessFromUsrClass(row.UsrClass).display}
-                    </td>
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
