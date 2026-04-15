@@ -16,26 +16,9 @@ import {
 import KpiCard from '../components/KpiCard';
 import FilterBar from '../components/FilterBar';
 import ChartCard from '../components/ChartCard';
-import { records } from '../data/dashboardData';
-import {
-  loadOpportunityImport,
-  normalizeDashboardDate,
-  OPPORTUNITY_IMPORT_EVENT,
-  normalizeBusinessValue,
-} from '../utils/opportunityImport';
+import { loadOpportunityImport, normalizeDashboardDate, OPPORTUNITY_IMPORT_EVENT, normalizeBusinessValue } from '../utils/opportunityImport';
 
 const STATIC_CLASSEUR_URL = '/data/Classeur.xlsx';
-
-const sum = (arr, selector) => arr.reduce((acc, item) => acc + selector(item), 0);
-
-const monthToDate = {
-  Jan: '2026-01-01',
-  Feb: '2026-02-01',
-  Mar: '2026-03-01',
-  Apr: '2026-04-01',
-  May: '2026-05-01',
-  Jun: '2026-06-01',
-};
 
 const minFilterDate = '2026-01-01';
 const maxFilterDate = '2026-06-30';
@@ -55,36 +38,22 @@ const POLICY_GWP_STATUSES = new Set([
 
 const QUOTATION_TAT_GROUPS = ['Sales', 'UW', 'Reinsurance', 'Risk engineer', 'Doctor'];
 const POLICY_TAT_GROUPS = ['AML', 'Finance', 'PA'];
-
 const ACTION_COLORS = ['#2563eb', '#16a34a', '#dc2626'];
-
-function groupBy(recordsList, key, valueSelector) {
-  return Object.entries(
-    recordsList.reduce((acc, item) => {
-      const group = item[key];
-      acc[group] = (acc[group] || 0) + valueSelector(item);
-      return acc;
-    }, {})
-  ).map(([name, value]) => ({ name, value }));
-}
 
 const isValidIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ''));
 
 const normalizeDashboardBusiness = (value) => {
   const normalized = normalizeBusinessValue(value);
-
   if (normalized === 'motor') return 'Motor';
   if (normalized === 'medical') return 'Medical';
   if (normalized === 'life') return 'Life';
   if (normalized === 'general') return 'General';
-
   return '';
 };
 
 const parseAmount = (value) => {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-
   const normalized = String(value).replace(/,/g, '').replace(/\s/g, '').trim();
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -93,7 +62,6 @@ const parseAmount = (value) => {
 const parseTurnaroundDays = (value) => {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-
   const raw = String(value).trim();
   const parsed = Number(raw.replace(/,/g, ''));
   return Number.isFinite(parsed) ? parsed : 0;
@@ -132,26 +100,20 @@ const normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();
 
 const normalizeAssignedByRoleForQuotationTat = (value) => {
   const raw = String(value ?? '').trim().toLowerCase();
-
   if (!raw) return '';
-
   if (raw.includes('corporate sales')) return 'Sales';
   if (raw.includes('underwriting')) return 'UW';
   if (raw.includes('reinsurance') || raw.includes('reinusrance')) return 'Reinsurance';
   if (raw.includes('risk engineer') || raw.includes('riskengineer')) return 'Risk engineer';
   if (raw.includes('doctor')) return 'Doctor';
-
   return '';
 };
 
 const normalizeAssignedByRoleForPoliciesTat = (value) => {
   const raw = String(value ?? '').trim().toLowerCase();
-
   if (!raw) return '';
-
   if (raw.includes('aml')) return 'AML';
   if (raw.includes('finance')) return 'Finance';
-
   if (
     raw === 'pa' ||
     raw.includes('policy admin') ||
@@ -164,22 +126,17 @@ const normalizeAssignedByRoleForPoliciesTat = (value) => {
   ) {
     return 'PA';
   }
-
   return '';
 };
 
 const normalizeAction = (value) => {
   const raw = String(value ?? '').trim().toLowerCase();
-
   if (!raw) return '';
-
   if (raw === 'approve' || raw.includes('approve')) {
     if (raw.includes('conditional')) return 'Approve Conditionally';
     return 'Approve';
   }
-
   if (raw.includes('reject')) return 'Reject';
-
   return '';
 };
 
@@ -195,7 +152,6 @@ const normalizeClasseurDate = (value) => {
   if (!match) return '';
 
   const [, day, monthToken, yearToken] = match;
-
   const monthMap = {
     JAN: '01',
     FEB: '02',
@@ -218,8 +174,8 @@ const normalizeClasseurDate = (value) => {
   return `${year}-${month}-${day.padStart(2, '0')}`;
 };
 
-const buildQuotationTatDataset = (rows, groups) => {
-  return groups.map((groupName) => {
+const buildQuotationTatDataset = (rows, groups) =>
+  groups.map((groupName) => {
     const groupRows = rows.filter(
       (row) => normalizeAssignedByRoleForQuotationTat(row.UsrAssignedByRole) === groupName
     );
@@ -253,10 +209,9 @@ const buildQuotationTatDataset = (rows, groups) => {
       avgMinutes: Number(avgMinutes.toFixed(2)),
     };
   });
-};
 
-const buildPolicyTatDataset = (rows, groups) => {
-  return groups.map((groupName) => {
+const buildPolicyTatDataset = (rows, groups) =>
+  groups.map((groupName) => {
     const groupRows = rows.filter(
       (row) => normalizeAssignedByRoleForPoliciesTat(row.UsrAssignedByRole) === groupName
     );
@@ -284,24 +239,14 @@ const buildPolicyTatDataset = (rows, groups) => {
       avgMinutes: Number(avgMinutes.toFixed(2)),
     };
   });
-};
 
 const TatTooltip = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
-
   const data = payload[0]?.payload;
   if (!data) return null;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 12,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
-      }}
-    >
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <div>Count: {data.count}</div>
       <div>Avg TAT Days: {data.avgDays}</div>
@@ -312,20 +257,11 @@ const TatTooltip = ({ active, payload, label }) => {
 
 const ConversionRateTooltip = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
-
   const data = payload[0]?.payload;
   if (!data) return null;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 12,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
-      }}
-    >
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <div>Quotations: {data.quotations}</div>
       <div>Complete: {data.policies}</div>
@@ -336,20 +272,11 @@ const ConversionRateTooltip = ({ active, payload, label }) => {
 
 const ActionPieTooltip = ({ active, payload }) => {
   if (!active || !payload || payload.length === 0) return null;
-
   const data = payload[0]?.payload;
   if (!data) return null;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 12,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
-      }}
-    >
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{data.name}</div>
       <div>Count: {data.value}</div>
     </div>
@@ -421,12 +348,7 @@ export default function DashboardPage() {
         const workbook = XLSX.read(buffer, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const firstSheet = workbook.Sheets[firstSheetName];
-
-        const rawRows = XLSX.utils.sheet_to_json(firstSheet, {
-          defval: '',
-          raw: false,
-        });
-
+        const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false });
         setClasseurRows(rawRows);
       } catch (error) {
         setClasseurRows([]);
@@ -450,30 +372,19 @@ export default function DashboardPage() {
           : prev.toDate;
 
       if (nextFrom > nextTo) {
-        return {
-          ...prev,
-          fromDate: effectiveMinDate,
-          toDate: effectiveMaxDate,
-        };
+        return { ...prev, fromDate: effectiveMinDate, toDate: effectiveMaxDate };
       }
 
       if (nextFrom === prev.fromDate && nextTo === prev.toDate) {
         return prev;
       }
 
-      return {
-        ...prev,
-        fromDate: nextFrom,
-        toDate: nextTo,
-      };
+      return { ...prev, fromDate: nextFrom, toDate: nextTo };
     });
   }, [effectiveMinDate, effectiveMaxDate]);
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
   const filteredImportedRows = useMemo(() => {
@@ -481,17 +392,10 @@ export default function DashboardPage() {
 
     return importedRows.filter((row) => {
       const submissionDate = normalizeDashboardDate(row.UsrQuoteSubmissionDate);
-      if (!isValidIsoDate(submissionDate)) {
-        return false;
-      }
+      if (!isValidIsoDate(submissionDate)) return false;
 
-      const matchesDate =
-        submissionDate >= filters.fromDate && submissionDate <= filters.toDate;
-
-      const mappedBusiness = normalizeDashboardBusiness(
-        row['Business Mapping'] ?? row.UsrClass
-      );
-
+      const matchesDate = submissionDate >= filters.fromDate && submissionDate <= filters.toDate;
+      const mappedBusiness = normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass);
       const matchesBusiness =
         !Array.isArray(filters.businesses) ||
         filters.businesses.length === 0 ||
@@ -506,15 +410,10 @@ export default function DashboardPage() {
 
     return classeurRows.filter((row) => {
       const requestDate = normalizeClasseurDate(row.UsrRequestDateTimeIn);
-      if (!isValidIsoDate(requestDate)) {
-        return false;
-      }
+      if (!isValidIsoDate(requestDate)) return false;
 
-      const matchesDate =
-        requestDate >= filters.fromDate && requestDate <= filters.toDate;
-
+      const matchesDate = requestDate >= filters.fromDate && requestDate <= filters.toDate;
       const mappedBusiness = normalizeDashboardBusiness(row.UsrBusiness);
-
       const matchesBusiness =
         !Array.isArray(filters.businesses) ||
         filters.businesses.length === 0 ||
@@ -524,13 +423,15 @@ export default function DashboardPage() {
     });
   }, [classeurRows, filters.businesses, filters.fromDate, filters.toDate]);
 
-  const quotationsTatByDepartment = useMemo(() => {
-    return buildQuotationTatDataset(filteredClasseurRows, QUOTATION_TAT_GROUPS);
-  }, [filteredClasseurRows]);
+  const quotationsTatByDepartment = useMemo(
+    () => buildQuotationTatDataset(filteredClasseurRows, QUOTATION_TAT_GROUPS),
+    [filteredClasseurRows]
+  );
 
-  const policiesTatByDepartment = useMemo(() => {
-    return buildPolicyTatDataset(filteredClasseurRows, POLICY_TAT_GROUPS);
-  }, [filteredClasseurRows]);
+  const policiesTatByDepartment = useMemo(
+    () => buildPolicyTatDataset(filteredClasseurRows, POLICY_TAT_GROUPS),
+    [filteredClasseurRows]
+  );
 
   const actionPieData = useMemo(() => {
     const grouped = filteredClasseurRows.reduce((acc, row) => {
@@ -545,39 +446,36 @@ export default function DashboardPage() {
 
     return ordered
       .filter((name) => grouped[name] > 0)
-      .map((name) => ({
-        name,
-        value: grouped[name],
-      }));
+      .map((name) => ({ name, value: grouped[name] }));
   }, [filteredClasseurRows]);
 
   const quotationsCount = useMemo(() => filteredImportedRows.length, [filteredImportedRows]);
 
-  const policiesConvertedCount = useMemo(() => {
-    return filteredImportedRows.filter(
-      (row) => normalizeStatus(row.UsrStatus) === 'complete'
-    ).length;
-  }, [filteredImportedRows]);
+  const policiesConvertedCount = useMemo(
+    () =>
+      filteredImportedRows.filter((row) => normalizeStatus(row.UsrStatus) === 'complete').length,
+    [filteredImportedRows]
+  );
 
-  const quotationsGwp = useMemo(() => {
-    return filteredImportedRows.reduce(
-      (acc, row) => acc + parseAmount(row.UsrQuotationAmount),
-      0
-    );
-  }, [filteredImportedRows]);
+  const quotationsGwp = useMemo(
+    () =>
+      filteredImportedRows.reduce((acc, row) => acc + parseAmount(row.UsrQuotationAmount), 0),
+    [filteredImportedRows]
+  );
 
-  const policiesGwp = useMemo(() => {
-    return filteredImportedRows
-      .filter((row) => POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus)))
-      .reduce((acc, row) => acc + parseAmount(row.UsrQuotationAmount), 0);
-  }, [filteredImportedRows]);
+  const policiesGwp = useMemo(
+    () =>
+      filteredImportedRows
+        .filter((row) => POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus)))
+        .reduce((acc, row) => acc + parseAmount(row.UsrQuotationAmount), 0),
+    [filteredImportedRows]
+  );
 
   const metrics = useMemo(() => {
     const quotations = quotationsCount;
     const policies = policiesConvertedCount;
     const conversionRate = quotations === 0 ? 0 : (policies / quotations) * 100;
-    const gwpConversionRate =
-      quotationsGwp === 0 ? 0 : (policiesGwp / quotationsGwp) * 100;
+    const gwpConversionRate = quotationsGwp === 0 ? 0 : (policiesGwp / quotationsGwp) * 100;
 
     return {
       quotations,
@@ -606,12 +504,9 @@ export default function DashboardPage() {
       const business =
         normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass) || 'Unknown';
 
-      if (!acc[business]) {
-        acc[business] = { quotations: 0, policies: 0 };
-      }
+      if (!acc[business]) acc[business] = { quotations: 0, policies: 0 };
 
       acc[business].quotations += 1;
-
       if (normalizeStatus(row.UsrStatus) === 'complete') {
         acc[business].policies += 1;
       }
@@ -623,42 +518,17 @@ export default function DashboardPage() {
       name,
       quotations: val.quotations,
       policies: val.policies,
-      value:
-        val.quotations === 0
-          ? 0
-          : Number(((val.policies / val.quotations) * 100).toFixed(1)),
+      value: val.quotations === 0 ? 0 : Number(((val.policies / val.quotations) * 100).toFixed(1)),
     }));
   }, [filteredImportedRows]);
-
-  const filteredRecords = useMemo(() => {
-    return records.filter((record) => {
-      const recordDate = monthToDate[record.month];
-      const matchesDate = recordDate >= filters.fromDate && recordDate <= filters.toDate;
-
-      const matchesBusiness =
-        !Array.isArray(filters.businesses) ||
-        filters.businesses.length === 0 ||
-        filters.businesses.includes(record.lob);
-
-      return matchesDate && matchesBusiness;
-    });
-  }, [filters.businesses, filters.fromDate, filters.toDate]);
-
-  const durationBuckets = useMemo(() => {
-    return groupBy(filteredRecords, 'durationBucket', (r) => r.convertedPolicies);
-  }, [filteredRecords]);
 
   const gwpByRegionQuotationVsPolicies = useMemo(() => {
     const grouped = filteredImportedRows.reduce((acc, row) => {
       const region = String(row.UsrRegion ?? '').trim() || 'Blank';
-
-      if (!acc[region]) {
-        acc[region] = { name: region, quotation: 0, policies: 0 };
-      }
+      if (!acc[region]) acc[region] = { name: region, quotation: 0, policies: 0 };
 
       const amount = parseAmount(row.UsrQuotationAmount);
       acc[region].quotation += amount;
-
       if (POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus))) {
         acc[region].policies += amount;
       }
@@ -674,13 +544,10 @@ export default function DashboardPage() {
       const business =
         normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass) || 'Unknown';
 
-      if (!acc[business]) {
-        acc[business] = { name: business, quotation: 0, policies: 0 };
-      }
+      if (!acc[business]) acc[business] = { name: business, quotation: 0, policies: 0 };
 
       const amount = parseAmount(row.UsrQuotationAmount);
       acc[business].quotation += amount;
-
       if (POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus))) {
         acc[business].policies += amount;
       }
@@ -694,14 +561,10 @@ export default function DashboardPage() {
   const gwpBySourceQuotationVsPolicies = useMemo(() => {
     const grouped = filteredImportedRows.reduce((acc, row) => {
       const source = String(row.UsrSource ?? '').trim() || 'Blank';
-
-      if (!acc[source]) {
-        acc[source] = { name: source, quotation: 0, policies: 0 };
-      }
+      if (!acc[source]) acc[source] = { name: source, quotation: 0, policies: 0 };
 
       const amount = parseAmount(row.UsrQuotationAmount);
       acc[source].quotation += amount;
-
       if (POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus))) {
         acc[source].policies += amount;
       }
@@ -712,6 +575,46 @@ export default function DashboardPage() {
     return Object.values(grouped).sort((a, b) => b.quotation - a.quotation);
   }, [filteredImportedRows]);
 
+  const policiesConvertedByDuration = useMemo(() => {
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const buckets = {
+      '<1 day': 0,
+      '1-3 days': 0,
+      '4-7 days': 0,
+      '>7 days': 0,
+    };
+
+    filteredClasseurRows
+      .filter((row) => String(row.UsrAction ?? '').trim().toLowerCase() === 'issue policy')
+      .forEach((row) => {
+        const isoDate = normalizeClasseurDate(row.UsrRequestDateTimeIn);
+        if (!isValidIsoDate(isoDate)) return;
+
+        const requestDate = new Date(`${isoDate}T00:00:00`);
+        const diffMs = startOfToday.getTime() - requestDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        if (diffDays < 1) {
+          buckets['<1 day'] += 1;
+        } else if (diffDays <= 3) {
+          buckets['1-3 days'] += 1;
+        } else if (diffDays <= 7) {
+          buckets['4-7 days'] += 1;
+        } else {
+          buckets['>7 days'] += 1;
+        }
+      });
+
+    return [
+      { name: '<1 day', value: buckets['<1 day'] },
+      { name: '1-3 days', value: buckets['1-3 days'] },
+      { name: '4-7 days', value: buckets['4-7 days'] },
+      { name: '>7 days', value: buckets['>7 days'] },
+    ];
+  }, [filteredClasseurRows]);
+
   return (
     <>
       <FilterBar filters={filters} onFilterChange={handleFilterChange} />
@@ -719,33 +622,13 @@ export default function DashboardPage() {
       <section className="kpi-grid kpi-grid-three">
         <KpiCard title="Quotations" value={metrics.quotations} showTarget={false} />
         <KpiCard title="Policies Converted" value={metrics.policies} showTarget={false} />
-        <KpiCard
-          title="Conversion Rate"
-          value={metrics.conversionRate}
-          suffix="%"
-          showTarget={false}
-        />
+        <KpiCard title="Conversion Rate" value={metrics.conversionRate} suffix="%" showTarget={false} />
       </section>
 
       <section className="kpi-grid kpi-grid-three">
-        <KpiCard
-          title="Quotations GWP"
-          value={metrics.quotationsGwp}
-          currency
-          showTarget={false}
-        />
-        <KpiCard
-          title="Policies GWP"
-          value={metrics.policiesGwp}
-          currency
-          showTarget={false}
-        />
-        <KpiCard
-          title="GWP Conversion Rate"
-          value={metrics.gwpConversionRate}
-          suffix="%"
-          showTarget={false}
-        />
+        <KpiCard title="Quotations GWP" value={metrics.quotationsGwp} currency showTarget={false} />
+        <KpiCard title="Policies GWP" value={metrics.policiesGwp} currency showTarget={false} />
+        <KpiCard title="GWP Conversion Rate" value={metrics.gwpConversionRate} suffix="%" showTarget={false} />
       </section>
 
       <section className="two-col">
@@ -766,10 +649,7 @@ export default function DashboardPage() {
               <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
               <Tooltip
                 formatter={(value) => [value, 'Count']}
-                contentStyle={{
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                }}
+                contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0' }}
               />
               <Bar dataKey="value" radius={[10, 10, 0, 0]} barSize={34} />
             </BarChart>
@@ -780,18 +660,8 @@ export default function DashboardPage() {
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={conversionByBusiness} barCategoryGap="25%">
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 12 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                unit="%"
-                tick={{ fontSize: 12 }}
-                axisLine={false}
-                tickLine={false}
-              />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis unit="%" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
               <Tooltip content={<ConversionRateTooltip />} />
               <Bar dataKey="value" radius={[10, 10, 0, 0]} barSize={40} />
             </BarChart>
@@ -871,11 +741,11 @@ export default function DashboardPage() {
       <section className="three-col">
         <ChartCard title="Policies Converted by Duration">
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={durationBuckets}>
+            <BarChart data={policiesConvertedByDuration}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip />
+              <Tooltip formatter={(value) => [value, 'Count']} />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
