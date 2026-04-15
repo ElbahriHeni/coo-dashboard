@@ -35,6 +35,19 @@ const MONTH_INDEX = {
 const STORAGE_KEY = 'crm-opportunity-import';
 export const OPPORTUNITY_IMPORT_EVENT = 'opportunity-import-updated';
 
+const GENERAL_CLASS_NAMES = new Set([
+  'general accident',
+  'engineering',
+  'marine cargo',
+  'marine hull',
+  'fire',
+  'aviation',
+  'energy',
+  'travel',
+  'liability',
+  'professional indemnity',
+]);
+
 export const normalizeHeader = (value) => String(value ?? '').trim().toLowerCase();
 
 export const normalizeText = (value) => String(value ?? '').trim();
@@ -46,12 +59,96 @@ export const normalizeBusinessValue = (value) => {
 
   if (!normalized) return '';
 
-  if (normalized.includes('motor') || normalized.includes('mortor')) return 'motor';
-  if (normalized.includes('medical')) return 'medical';
-  if (normalized.includes('life')) return 'life';
-  if (normalized.includes('general')) return 'general';
+  if (
+    normalized === 'motor' ||
+    normalized.includes('motor') ||
+    normalized.includes('mortor')
+  ) {
+    return 'motor';
+  }
+
+  if (normalized === 'medical' || normalized.includes('medical')) {
+    return 'medical';
+  }
+
+  if (
+    normalized === 'life' ||
+    normalized === 'individual life' ||
+    normalized.includes('individual life')
+  ) {
+    return 'life';
+  }
+
+  if (
+    normalized === 'general' ||
+    GENERAL_CLASS_NAMES.has(normalized)
+  ) {
+    return 'general';
+  }
 
   return normalized;
+};
+
+export const formatBusinessLabel = (value) => {
+  const normalized = normalizeBusinessValue(value);
+
+  if (normalized === 'motor') return 'Motor';
+  if (normalized === 'medical') return 'Medical';
+  if (normalized === 'life') return 'Life';
+  if (normalized === 'general') return 'General';
+
+  return normalizeText(value);
+};
+
+export const getMappedBusinessFromUsrClass = (usrClassValue) => {
+  const rawValue = normalizeText(usrClassValue);
+  const normalized = normalizeBusinessValue(rawValue);
+
+  if (!rawValue) {
+    return {
+      business: '',
+      status: 'missing',
+      display: 'Issue: Missing UsrClass',
+    };
+  }
+
+  if (normalized === 'motor') {
+    return {
+      business: 'Motor',
+      status: 'ok',
+      display: 'Motor',
+    };
+  }
+
+  if (normalized === 'medical') {
+    return {
+      business: 'Medical',
+      status: 'ok',
+      display: 'Medical',
+    };
+  }
+
+  if (normalized === 'life') {
+    return {
+      business: 'Life',
+      status: 'ok',
+      display: 'Life',
+    };
+  }
+
+  if (normalized === 'general') {
+    return {
+      business: 'General',
+      status: 'ok',
+      display: 'General',
+    };
+  }
+
+  return {
+    business: '',
+    status: 'unmapped',
+    display: `Issue: Unmapped UsrClass (${rawValue})`,
+  };
 };
 
 export const normalizeDashboardDate = (value) => {
