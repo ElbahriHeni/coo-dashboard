@@ -17,7 +17,7 @@ import {
   loadOpportunityImport,
   normalizeDashboardDate,
   OPPORTUNITY_IMPORT_EVENT,
-  getQuotationsCount,
+  normalizeBusinessValue,
 } from '../utils/opportunityImport';
 
 const sum = (arr, selector) => arr.reduce((acc, item) => acc + selector(item), 0);
@@ -44,6 +44,17 @@ function groupBy(recordsList, key, valueSelector) {
   ).map(([name, value]) => ({ name, value }));
 }
 
+const isValidIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ''));
+
+const normalizeDashboardBusiness = (value) => {
+  const normalized = normalizeBusinessValue(value);
+  if (normalized === 'motor') return 'Motor';
+  if (normalized === 'medical') return 'Medical';
+  if (normalized === 'life') return 'Life';
+  if (normalized === 'general') return 'General';
+  return '';
+};
+
 export default function DashboardPage() {
   const [importedWorkbook, setImportedWorkbook] = useState(() => loadOpportunityImport());
 
@@ -58,7 +69,7 @@ export default function DashboardPage() {
 
   const importedFilterDates = importedRows
     .map((row) => normalizeDashboardDate(row.UsrQuoteSubmissionDate))
-    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? '')))
+    .filter((value) => isValidIsoDate(value))
     .sort();
 
   const effectiveMinDate = importedFilterDates[0] ?? minFilterDate;
@@ -128,28 +139,44 @@ export default function DashboardPage() {
     }));
   };
 
-  const quotationsCount = useMemo(() => {
-    if (importedRows.length === 0) {
-      return 0;
-    }
+  const filteredImportedRows = useMemo(() => {
+    if (importedRows.length === 0) return [];
 
-    return getQuotationsCount({
-      region: filters.region,
-      source: filters.source,
-      fromDate: filters.fromDate,
-      toDate: filters.toDate,
-      businesses: filters.businesses,
+    return importedRows.filter((row) => {
+      const opportunityName = String(row.UsrOpportunityName ?? '').trim();
+      if (!opportunityName) return false;
+
+      const submissionDate = normalizeDashboardDate(row.UsrQuoteSubmissionDate);
+      if (!isValidIsoDate(submissionDate)) return false;
+
+      const matchesDate =
+        submissionDate >= filters.fromDate && submissionDate <= filters.toDate;
+
+      const matchesBusiness =
+        !Array.isArray(filters.businesses) ||
+        filters.businesses.length === 0 ||
+        filters.businesses.includes(
+          normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass)
+        );
+
+      return matchesDate && matchesBusiness;
     });
-  }, [filters, importedRows.length]);
+  }, [filters.businesses, filters.fromDate, filters.toDate, importedRows]);
+
+  const quotationsCount = filteredImportedRows.length;
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const recordDate = monthToDate[record.month];
       const matchesDate = recordDate >= filters.fromDate && recordDate <= filters.toDate;
-      const matchesRegion = !filters.region || filters.region === 'All' || record.region === filters.region;
-      const matchesSource = !filters.source || filters.source === 'All' || record.source === filters.source;
+      const matchesRegion =
+        !filters.region || filters.region === 'All' || record.region === filters.region;
+      const matchesSource =
+        !filters.source || filters.source === 'All' || record.source === filters.source;
       const matchesDepartment =
-        !filters.department || filters.department === 'All' || record.department === filters.department;
+        !filters.department ||
+        filters.department === 'All' ||
+        record.department === filters.department;
 
       const matchesBusiness =
         !Array.isArray(filters.businesses) ||
