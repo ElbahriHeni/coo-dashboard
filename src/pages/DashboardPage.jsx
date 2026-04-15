@@ -658,7 +658,13 @@ const quotesByStatus = useMemo(() => {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={pipeline}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
+              <XAxis
+              dataKey="name"
+              interval={0}
+              angle={-35}
+              textAnchor="end"
+              height={90}
+              />
               <YAxis />
               <Tooltip />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} />
