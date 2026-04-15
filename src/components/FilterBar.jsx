@@ -2,13 +2,7 @@ import React from 'react';
 
 const BUSINESS_OPTIONS = ['General', 'Motor', 'Medical', 'Life'];
 
-export default function FilterBar({
-  filters,
-  onFilterChange,
-  regions = [],
-  sources = [],
-  departments = [],
-}) {
+export default function FilterBar({ filters, onFilterChange }) {
   const selectedBusinesses = Array.isArray(filters.businesses) ? filters.businesses : [];
 
   const handleInputChange = (event) => {
@@ -28,7 +22,7 @@ export default function FilterBar({
 
   return (
     <div className="card filter-bar">
-      <div className="filter-grid">
+      <div className="filter-grid filter-grid-compact">
         <div className="filter-field">
           <label htmlFor="fromDate">Date From</label>
           <input
@@ -51,7 +45,7 @@ export default function FilterBar({
           />
         </div>
 
-        <div className="filter-field">
+        <div className="filter-field filter-field-wide">
           <label>Business</label>
           <div className="business-pill-group">
             {BUSINESS_OPTIONS.map((business) => {
@@ -69,57 +63,6 @@ export default function FilterBar({
               );
             })}
           </div>
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="region">Region</label>
-          <select
-            id="region"
-            name="region"
-            value={filters.region || 'All'}
-            onChange={handleInputChange}
-          >
-            <option value="All">All</option>
-            {regions.map((region) => (
-              <option key={region} value={region}>
-                {region}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="source">Source</label>
-          <select
-            id="source"
-            name="source"
-            value={filters.source || 'All'}
-            onChange={handleInputChange}
-          >
-            <option value="All">All</option>
-            {sources.map((source) => (
-              <option key={source} value={source}>
-                {source}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-field">
-          <label htmlFor="department">Department</label>
-          <select
-            id="department"
-            name="department"
-            value={filters.department || 'All'}
-            onChange={handleInputChange}
-          >
-            <option value="All">All</option>
-            {departments.map((department) => (
-              <option key={department} value={department}>
-                {department}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
     </div>
