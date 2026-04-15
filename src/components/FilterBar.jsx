@@ -16,9 +16,14 @@ export default function FilterBar({
     onFilterChange(name, value);
   };
 
-  const handleBusinessChange = (event) => {
-    const values = Array.from(event.target.selectedOptions, (option) => option.value);
-    onFilterChange('businesses', values);
+  const toggleBusiness = (business) => {
+    const exists = selectedBusinesses.includes(business);
+
+    const nextBusinesses = exists
+      ? selectedBusinesses.filter((item) => item !== business)
+      : [...selectedBusinesses, business];
+
+    onFilterChange('businesses', nextBusinesses);
   };
 
   return (
@@ -47,22 +52,23 @@ export default function FilterBar({
         </div>
 
         <div className="filter-field">
-          <label htmlFor="businesses">Business</label>
-          <select
-            id="businesses"
-            name="businesses"
-            multiple
-            value={selectedBusinesses}
-            onChange={handleBusinessChange}
-            className="multi-select"
-          >
-            {BUSINESS_OPTIONS.map((business) => (
-              <option key={business} value={business}>
-                {business}
-              </option>
-            ))}
-          </select>
-          <small className="filter-help">Hold Ctrl or Cmd to select multiple</small>
+          <label>Business</label>
+          <div className="business-pill-group">
+            {BUSINESS_OPTIONS.map((business) => {
+              const isActive = selectedBusinesses.includes(business);
+
+              return (
+                <button
+                  key={business}
+                  type="button"
+                  className={`business-pill${isActive ? ' active' : ''}`}
+                  onClick={() => toggleBusiness(business)}
+                >
+                  {business}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="filter-field">
