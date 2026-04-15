@@ -49,7 +49,7 @@ const POLICY_GWP_STATUSES = new Set([
 ]);
 
 const QUOTATION_TAT_GROUPS = ['Sales', 'UW', 'Reinsurance', 'Risk engineer', 'Doctor'];
-const POLICY_TAT_GROUPS = ['AML', 'Finance', 'Policy Admin'];
+const POLICY_TAT_GROUPS = ['AML', 'Finance', 'PA'];
 
 function groupBy(recordsList, key, valueSelector) {
   return Object.entries(
@@ -78,58 +78,50 @@ const parseAmount = (value) => {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
 
-  const normalized = String(value)
-    .replace(/,/g, '')
-    .replace(/\s/g, '')
-    .trim();
-
+  const normalized = String(value).replace(/,/g, '').replace(/\s/g, '').trim();
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const parseNumber = (value) => {
+const parseTurnaroundDays = (value) => {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+  const raw = String(value).trim();
+  const parsed = Number(raw.replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const parseTurnaroundMinutes = (value) => {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
 
   const raw = String(value).trim();
 
-  if (!raw) return 0;
-
-  const timeMatch = raw.match(/^(\d{1,2}):(\d{2})$/);
-  if (timeMatch) {
-    const minutes = Number(timeMatch[1]);
-    const seconds = Number(timeMatch[2]);
-
+  const mmssMatch = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (mmssMatch) {
+    const minutes = Number(mmssMatch[1]);
+    const seconds = Number(mmssMatch[2]);
     if (Number.isFinite(minutes) && Number.isFinite(seconds)) {
       return minutes + seconds / 60;
     }
   }
 
-  const normalized = raw.replace(/,/g, '');
-  const parsed = Number(normalized);
+  const hhmmssMatch = raw.match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (hhmmssMatch) {
+    const hours = Number(hhmmssMatch[1]);
+    const minutes = Number(hhmmssMatch[2]);
+    const seconds = Number(hhmmssMatch[3]);
+    if (Number.isFinite(hours) && Number.isFinite(minutes) && Number.isFinite(seconds)) {
+      return hours * 60 + minutes + seconds / 60;
+    }
+  }
+
+  const parsed = Number(raw.replace(/,/g, ''));
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-
 const normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();
-
-const normalizeAssignToGroup = (value) => {
-  const raw = String(value ?? '').trim().toLowerCase();
-
-  if (!raw) return '';
-
-  if (raw === 'sales') return 'Sales';
-  if (raw === 'crc') return 'CRC';
-  if (raw === 'uw') return 'UW';
-  if (raw === 'reinsurance') return 'Reinsurance';
-  if (raw === 'risk engineer' || raw === 'riskengineer') return 'Risk engineer';
-  if (raw === 'doctor') return 'Doctor';
-  if (raw === 'aml') return 'AML';
-  if (raw === 'finance') return 'Finance';
-  if (raw === 'policy admin' || raw === 'policyadmin') return 'Policy Admin';
-
-  return String(value ?? '').trim();
-};
 
 const normalizeAssignedByRoleForQuotationTat = (value) => {
   const raw = String(value ?? '').trim().toLowerCase();
@@ -141,6 +133,31 @@ const normalizeAssignedByRoleForQuotationTat = (value) => {
   if (raw.includes('reinsurance') || raw.includes('reinusrance')) return 'Reinsurance';
   if (raw.includes('risk engineer') || raw.includes('riskengineer')) return 'Risk engineer';
   if (raw.includes('doctor')) return 'Doctor';
+
+  return '';
+};
+
+const normalizeAssignToGroup = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase();
+
+  if (!raw) return '';
+
+  if (raw.includes('aml')) return 'AML';
+
+  if (raw.includes('finance')) return 'Finance';
+
+  if (
+    raw === 'pa' ||
+    raw.includes('policy admin') ||
+    raw.includes('policy administration') ||
+    raw.includes('policy admin member') ||
+    raw.includes('policy admin agent') ||
+    raw.includes('policy admin supervisor') ||
+    raw.includes('policy issuance') ||
+    raw.includes('policy')
+  ) {
+    return 'PA';
+  }
 
   return '';
 };
@@ -195,12 +212,18 @@ const buildQuotationTatDataset = (rows, groups) => {
     const avgDays =
       count === 0
         ? 0
-        : rowsWithRequestId.reduce((acc, row) => acc + parseNumber(row.UsrTurnaroundDays), 0) / count;
+        : rowsWithRequestId.reduce(
+            (acc, row) => acc + parseTurnaroundDays(row.UsrTurnaroundDays),
+            0
+          ) / count;
 
     const avgMinutes =
       count === 0
         ? 0
-        : rowsWithRequestId.reduce((acc, row) => acc + parseNumber(row.UsrTurnaroundTime), 0) / count;
+        : rowsWithRequestId.reduce(
+            (acc, row) => acc + parseTurnaroundMinutes(row.UsrTurnaroundTime),
+            0
+          ) / count;
 
     return {
       name: groupName,
@@ -222,12 +245,16 @@ const buildPolicyTatDataset = (rows, groups) => {
     const avgDays =
       count === 0
         ? 0
-        : groupRows.reduce((acc, row) => acc + parseNumber(row.UsrTurnaroundDays), 0) / count;
+        : groupRows.reduce((acc, row) => acc + parseTurnaroundDays(row.UsrTurnaroundDays), 0) /
+          count;
 
     const avgMinutes =
       count === 0
         ? 0
-        : groupRows.reduce((acc, row) => acc + parseNumber(row.UsrTurnaroundTime), 0) / count;
+        : groupRows.reduce(
+            (acc, row) => acc + parseTurnaroundMinutes(row.UsrTurnaroundTime),
+            0
+          ) / count;
 
     return {
       name: groupName,
