@@ -17,9 +17,11 @@ import {
   loadOpportunityImport,
   normalizeDashboardDate,
   OPPORTUNITY_IMPORT_EVENT,
+  getQuotationsCount,
 } from '../utils/opportunityImport';
 
 const sum = (arr, selector) => arr.reduce((acc, item) => acc + selector(item), 0);
+
 const monthToDate = {
   Jan: '2026-01-01',
   Feb: '2026-02-01',
@@ -28,6 +30,7 @@ const monthToDate = {
   May: '2026-05-01',
   Jun: '2026-06-01',
 };
+
 const minFilterDate = '2026-01-01';
 const maxFilterDate = '2026-06-30';
 
@@ -43,21 +46,31 @@ function groupBy(recordsList, key, valueSelector) {
 
 export default function DashboardPage() {
   const [importedWorkbook, setImportedWorkbook] = useState(() => loadOpportunityImport());
+
   const importedSheet =
-    importedWorkbook?.workbookData?.sheets?.find((sheet) => sheet.name === importedWorkbook.activeSheet) ??
+    importedWorkbook?.workbookData?.sheets?.find(
+      (sheet) => sheet.name === importedWorkbook?.activeSheet
+    ) ??
     importedWorkbook?.workbookData?.sheets?.[0] ??
     null;
+
   const importedRows = importedSheet?.rows ?? [];
+
   const importedFilterDates = importedRows
     .map((row) => normalizeDashboardDate(row.UsrQuoteSubmissionDate))
     .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? '')))
     .sort();
+
   const effectiveMinDate = importedFilterDates[0] ?? minFilterDate;
   const effectiveMaxDate = importedFilterDates[importedFilterDates.length - 1] ?? maxFilterDate;
 
   const [filters, setFilters] = useState({
-    from: effectiveMinDate,
-    to: effectiveMaxDate,
+    fromDate: effectiveMinDate,
+    toDate: effectiveMaxDate,
+    region: 'All',
+    source: 'All',
+    department: 'All',
+    businesses: [],
   });
 
   useEffect(() => {
@@ -79,59 +92,78 @@ export default function DashboardPage() {
   useEffect(() => {
     setFilters((prev) => {
       const nextFrom =
-        prev.from < effectiveMinDate || prev.from > effectiveMaxDate ? effectiveMinDate : prev.from;
+        !prev.fromDate || prev.fromDate < effectiveMinDate || prev.fromDate > effectiveMaxDate
+          ? effectiveMinDate
+          : prev.fromDate;
+
       const nextTo =
-        prev.to < effectiveMinDate || prev.to > effectiveMaxDate ? effectiveMaxDate : prev.to;
+        !prev.toDate || prev.toDate < effectiveMinDate || prev.toDate > effectiveMaxDate
+          ? effectiveMaxDate
+          : prev.toDate;
 
       if (nextFrom > nextTo) {
         return {
-          from: effectiveMinDate,
-          to: effectiveMaxDate,
+          ...prev,
+          fromDate: effectiveMinDate,
+          toDate: effectiveMaxDate,
         };
       }
 
-      if (nextFrom === prev.from && nextTo === prev.to) {
+      if (nextFrom === prev.fromDate && nextTo === prev.toDate) {
         return prev;
       }
 
       return {
-        from: nextFrom,
-        to: nextTo,
+        ...prev,
+        fromDate: nextFrom,
+        toDate: nextTo,
       };
     });
-  }, [effectiveMaxDate, effectiveMinDate]);
+  }, [effectiveMinDate, effectiveMaxDate]);
 
-  const filteredImportedRows = useMemo(() => {
-    if (importedRows.length === 0) return [];
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
 
-    const isFullImportedRange =
-      filters.from === effectiveMinDate && filters.to === effectiveMaxDate;
-
-    if (isFullImportedRange) {
-      return importedRows;
+  const quotationsCount = useMemo(() => {
+    if (importedRows.length === 0) {
+      return 0;
     }
 
-    return importedRows.filter((row) => {
-      const submissionDate = normalizeDashboardDate(row.UsrQuoteSubmissionDate);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(submissionDate ?? ''))) {
-        return false;
-      }
-      return submissionDate >= filters.from && submissionDate <= filters.to;
+    return getQuotationsCount({
+      region: filters.region,
+      source: filters.source,
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      businesses: filters.businesses,
     });
-  }, [effectiveMaxDate, effectiveMinDate, filters.from, filters.to, importedRows]);
+  }, [filters, importedRows.length]);
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const recordDate = monthToDate[record.month];
-      return recordDate >= filters.from && recordDate <= filters.to;
+      const matchesDate = recordDate >= filters.fromDate && recordDate <= filters.toDate;
+      const matchesRegion = !filters.region || filters.region === 'All' || record.region === filters.region;
+      const matchesSource = !filters.source || filters.source === 'All' || record.source === filters.source;
+      const matchesDepartment =
+        !filters.department || filters.department === 'All' || record.department === filters.department;
+
+      const matchesBusiness =
+        !Array.isArray(filters.businesses) ||
+        filters.businesses.length === 0 ||
+        filters.businesses.includes(record.lob);
+
+      return matchesDate && matchesRegion && matchesSource && matchesDepartment && matchesBusiness;
     });
   }, [filters]);
 
   const metrics = useMemo(() => {
     const quotations =
-      importedRows.length > 0
-        ? filteredImportedRows.length
-        : sum(filteredRecords, (r) => r.quotations);
+      importedRows.length > 0 ? quotationsCount : sum(filteredRecords, (r) => r.quotations);
+
     const policies = sum(filteredRecords, (r) => r.convertedPolicies);
     const conversionRate = quotations === 0 ? 0 : (policies / quotations) * 100;
     const expectedGwpMotor = sum(
@@ -139,8 +171,13 @@ export default function DashboardPage() {
       (r) => r.expectedGwp
     );
 
-    return { quotations, policies, conversionRate, expectedGwpMotor };
-  }, [filteredImportedRows.length, filteredRecords, importedRows.length]);
+    return {
+      quotations,
+      policies,
+      conversionRate,
+      expectedGwpMotor,
+    };
+  }, [filteredRecords, importedRows.length, quotationsCount]);
 
   const quotesByStatus = useMemo(() => {
     return groupBy(
@@ -150,10 +187,9 @@ export default function DashboardPage() {
     );
   }, [filteredRecords]);
 
-  const assignedByDepartment = useMemo(
-    () => groupBy(filteredRecords, 'department', (r) => r.quotations),
-    [filteredRecords]
-  );
+  const assignedByDepartment = useMemo(() => {
+    return groupBy(filteredRecords, 'department', (r) => r.quotations);
+  }, [filteredRecords]);
 
   const conversionByLob = useMemo(() => {
     return Object.values(
@@ -171,10 +207,9 @@ export default function DashboardPage() {
     }));
   }, [filteredRecords]);
 
-  const durationBuckets = useMemo(
-    () => groupBy(filteredRecords, 'durationBucket', (r) => r.convertedPolicies),
-    [filteredRecords]
-  );
+  const durationBuckets = useMemo(() => {
+    return groupBy(filteredRecords, 'durationBucket', (r) => r.convertedPolicies);
+  }, [filteredRecords]);
 
   const gwpComparisonByRegion = useMemo(() => {
     return Object.values(
@@ -218,16 +253,19 @@ export default function DashboardPage() {
   const pipeline = useMemo(() => {
     const leads = Math.round(metrics.quotations * 1.18);
     const quotations = metrics.quotations;
+
     const uw = sum(
       filteredRecords.filter((r) =>
         ['Pending UW', 'Approved', 'Converted', 'Rejected', 'Returned'].includes(r.status)
       ),
       (r) => r.quotations
     );
+
     const approved = sum(
       filteredRecords.filter((r) => ['Approved', 'Converted'].includes(r.status)),
       (r) => r.quotations
     );
+
     const issued = metrics.policies;
 
     return [
@@ -239,15 +277,26 @@ export default function DashboardPage() {
     ];
   }, [filteredRecords, metrics]);
 
-  const onFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  const availableRegions = useMemo(() => {
+    return [...new Set(records.map((item) => item.region).filter(Boolean))].sort();
+  }, []);
+
+  const availableSources = useMemo(() => {
+    return [...new Set(records.map((item) => item.source).filter(Boolean))].sort();
+  }, []);
+
+  const availableDepartments = useMemo(() => {
+    return [...new Set(records.map((item) => item.department).filter(Boolean))].sort();
+  }, []);
 
   return (
     <>
       <FilterBar
         filters={filters}
-        onChange={onFilterChange}
-        minDate={effectiveMinDate}
-        maxDate={effectiveMaxDate}
+        onFilterChange={handleFilterChange}
+        regions={availableRegions}
+        sources={availableSources}
+        departments={availableDepartments}
       />
 
       <section className="kpi-grid">
