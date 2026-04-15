@@ -48,10 +48,12 @@ const isValidIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? '')
 
 const normalizeDashboardBusiness = (value) => {
   const normalized = normalizeBusinessValue(value);
+
   if (normalized === 'motor') return 'Motor';
   if (normalized === 'medical') return 'Medical';
   if (normalized === 'life') return 'Life';
   if (normalized === 'general') return 'General';
+
   return '';
 };
 
@@ -143,36 +145,48 @@ export default function DashboardPage() {
     if (importedRows.length === 0) return [];
 
     return importedRows.filter((row) => {
-      const opportunityName = String(row.UsrOpportunityName ?? '').trim();
-      if (!opportunityName) return false;
-
       const submissionDate = normalizeDashboardDate(row.UsrQuoteSubmissionDate);
-      if (!isValidIsoDate(submissionDate)) return false;
+      if (!isValidIsoDate(submissionDate)) {
+        return false;
+      }
 
       const matchesDate =
         submissionDate >= filters.fromDate && submissionDate <= filters.toDate;
 
+      const mappedBusiness = normalizeDashboardBusiness(
+        row['Business Mapping'] ?? row.UsrClass
+      );
+
       const matchesBusiness =
         !Array.isArray(filters.businesses) ||
         filters.businesses.length === 0 ||
-        filters.businesses.includes(
-          normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass)
-        );
+        filters.businesses.includes(mappedBusiness);
 
       return matchesDate && matchesBusiness;
     });
   }, [filters.businesses, filters.fromDate, filters.toDate, importedRows]);
 
-  const quotationsCount = filteredImportedRows.length;
+  const quotationsCount = useMemo(() => {
+    return filteredImportedRows.length;
+  }, [filteredImportedRows]);
+
+  const policiesConvertedCount = useMemo(() => {
+    return filteredImportedRows.filter(
+      (row) => String(row.UsrStatus ?? '').trim().toLowerCase() === 'complete'
+    ).length;
+  }, [filteredImportedRows]);
 
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const recordDate = monthToDate[record.month];
       const matchesDate = recordDate >= filters.fromDate && recordDate <= filters.toDate;
+
       const matchesRegion =
         !filters.region || filters.region === 'All' || record.region === filters.region;
+
       const matchesSource =
         !filters.source || filters.source === 'All' || record.source === filters.source;
+
       const matchesDepartment =
         !filters.department ||
         filters.department === 'All' ||
@@ -191,8 +205,13 @@ export default function DashboardPage() {
     const quotations =
       importedRows.length > 0 ? quotationsCount : sum(filteredRecords, (r) => r.quotations);
 
-    const policies = sum(filteredRecords, (r) => r.convertedPolicies);
+    const policies =
+      importedRows.length > 0
+        ? policiesConvertedCount
+        : sum(filteredRecords, (r) => r.convertedPolicies);
+
     const conversionRate = quotations === 0 ? 0 : (policies / quotations) * 100;
+
     const expectedGwpMotor = sum(
       filteredRecords.filter((r) => r.lob === 'Motor'),
       (r) => r.expectedGwp
@@ -204,7 +223,7 @@ export default function DashboardPage() {
       conversionRate,
       expectedGwpMotor,
     };
-  }, [filteredRecords, importedRows.length, quotationsCount]);
+  }, [filteredRecords, importedRows.length, quotationsCount, policiesConvertedCount]);
 
   const quotesByStatus = useMemo(() => {
     return groupBy(
@@ -230,7 +249,10 @@ export default function DashboardPage() {
       }, {})
     ).map((item) => ({
       name: item.name,
-      value: item.quotations === 0 ? 0 : Number(((item.policies / item.quotations) * 100).toFixed(1)),
+      value:
+        item.quotations === 0
+          ? 0
+          : Number(((item.policies / item.quotations) * 100).toFixed(1)),
     }));
   }, [filteredRecords]);
 
