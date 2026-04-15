@@ -40,7 +40,9 @@ const maxFilterDate = '2026-06-30';
 const POLICY_GWP_STATUSES = new Set([
   'aml screening pending',
   'customer creation in-progress',
+  'customer creation in progress',
   'customer creation pending',
+  'escalated (at the account opening stage)',
   'policy generation in-progress',
   'policy generation pending',
   'returned by finance',
@@ -585,18 +587,26 @@ export default function DashboardPage() {
     return groupBy(filteredRecords, 'durationBucket', (r) => r.convertedPolicies);
   }, [filteredRecords]);
 
-  const gwpComparisonByRegion = useMemo(() => {
-    return Object.values(
-      filteredRecords.reduce((acc, item) => {
-        if (!acc[item.region]) {
-          acc[item.region] = { name: item.region, actual: 0, target: 0 };
-        }
-        acc[item.region].actual += item.actualGwp;
-        acc[item.region].target += item.expectedGwp;
-        return acc;
-      }, {})
-    );
-  }, [filteredRecords]);
+  const gwpByRegionQuotationVsPolicies = useMemo(() => {
+    const grouped = filteredImportedRows.reduce((acc, row) => {
+      const region = String(row.UsrRegion ?? '').trim() || 'Blank';
+
+      if (!acc[region]) {
+        acc[region] = { name: region, quotation: 0, policies: 0 };
+      }
+
+      const amount = parseAmount(row.UsrQuotationAmount);
+      acc[region].quotation += amount;
+
+      if (POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus))) {
+        acc[region].policies += amount;
+      }
+
+      return acc;
+    }, {});
+
+    return Object.values(grouped).sort((a, b) => b.quotation - a.quotation);
+  }, [filteredImportedRows]);
 
   const gwpComparisonByBusiness = useMemo(() => {
     return Object.values(
@@ -760,21 +770,21 @@ export default function DashboardPage() {
       </section>
 
       <section className="two-col">
-        <ChartCard title="GWP by Region: Actual vs Target">
+        <ChartCard title="GWP by Region: Quotation vs Policies">
           <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpComparisonByRegion} barGap={10}>
+            <BarChart data={gwpByRegionQuotationVsPolicies} barGap={10}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
               <Legend />
               <Tooltip
                 formatter={(value, name) => [
-                  `SAR ${value.toLocaleString()}`,
-                  name === 'actual' ? 'Actual GWP' : 'Target GWP',
+                  `SAR ${Number(value).toLocaleString()}`,
+                  name === 'quotation' ? 'Quotation GWP' : 'Policies GWP',
                 ]}
               />
-              <Bar dataKey="actual" name="Actual GWP" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="target" name="Target GWP" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="quotation" name="Quotation GWP" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="policies" name="Policies GWP" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
