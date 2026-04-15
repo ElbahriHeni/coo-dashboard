@@ -137,13 +137,12 @@ const normalizeAssignedByRoleForQuotationTat = (value) => {
   return '';
 };
 
-const normalizeAssignToGroup = (value) => {
+const normalizeAssignedByRoleForPoliciesTat = (value) => {
   const raw = String(value ?? '').trim().toLowerCase();
 
   if (!raw) return '';
 
   if (raw.includes('aml')) return 'AML';
-
   if (raw.includes('finance')) return 'Finance';
 
   if (
@@ -237,7 +236,7 @@ const buildQuotationTatDataset = (rows, groups) => {
 const buildPolicyTatDataset = (rows, groups) => {
   return groups.map((groupName) => {
     const groupRows = rows.filter(
-      (row) => normalizeAssignToGroup(row.UsrAssignToGroup) === groupName
+      (row) => normalizeAssignedByRoleForPoliciesTat(row.UsrAssignedByRole) === groupName
     );
 
     const count = groupRows.length;
