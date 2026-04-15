@@ -118,7 +118,6 @@ body {
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
 }
 
-/* Legacy filters kept for compatibility */
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -154,7 +153,6 @@ body {
   flex: 1;
 }
 
-/* New dashboard filter bar */
 .filter-bar {
   padding: 20px 22px;
   margin-bottom: 20px;
@@ -167,11 +165,19 @@ body {
   align-items: end;
 }
 
+.filter-grid-compact {
+  grid-template-columns: 220px 220px minmax(320px, 1fr);
+}
+
 .filter-field {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+}
+
+.filter-field-wide {
+  min-width: 320px;
 }
 
 .filter-field label {
@@ -248,6 +254,10 @@ body {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 20px;
+}
+
+.kpi-grid-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .kpi-card {
@@ -471,10 +481,15 @@ body {
   .filter-grid {
     grid-template-columns: repeat(3, minmax(180px, 1fr));
   }
+
+  .filter-grid-compact {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
 }
 
 @media (max-width: 1200px) {
   .kpi-grid,
+  .kpi-grid-five,
   .filters-grid,
   .three-col,
   .spreadsheet-meta-grid {
@@ -486,9 +501,11 @@ body {
   .two-col,
   .three-col,
   .kpi-grid,
+  .kpi-grid-five,
   .filters-grid,
   .spreadsheet-meta-grid,
-  .filter-grid {
+  .filter-grid,
+  .filter-grid-compact {
     grid-template-columns: 1fr;
   }
 
@@ -519,5 +536,9 @@ body {
   .business-pill {
     width: 100%;
     justify-content: center;
+  }
+
+  .filter-field-wide {
+    min-width: 0;
   }
 }
