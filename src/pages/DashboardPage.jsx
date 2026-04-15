@@ -39,7 +39,7 @@ const maxFilterDate = '2026-06-30';
 
 const POLICY_GWP_STATUSES = new Set([
   'aml screening pending',
-  'customer creation in progress',
+  'customer creation in-progress',
   'customer creation pending',
   'policy generation in-progress',
   'policy generation pending',
@@ -288,6 +288,30 @@ const TatTooltip = ({ active, payload, label }) => {
   );
 };
 
+const ConversionRateTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  return (
+    <div
+      style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 12,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
+      <div>Quotations: {data.quotations}</div>
+      <div>Complete: {data.policies}</div>
+      <div>Conversion Rate: {data.value}%</div>
+    </div>
+  );
+};
+
 export default function DashboardPage() {
   const [importedWorkbook, setImportedWorkbook] = useState(() => loadOpportunityImport());
   const [classeurRows, setClasseurRows] = useState([]);
@@ -514,6 +538,35 @@ export default function DashboardPage() {
       .sort((a, b) => b.value - a.value);
   }, [filteredImportedRows]);
 
+  const conversionByBusiness = useMemo(() => {
+    const grouped = filteredImportedRows.reduce((acc, row) => {
+      const business =
+        normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass) || 'Unknown';
+
+      if (!acc[business]) {
+        acc[business] = { quotations: 0, policies: 0 };
+      }
+
+      acc[business].quotations += 1;
+
+      if (normalizeStatus(row.UsrStatus) === 'complete') {
+        acc[business].policies += 1;
+      }
+
+      return acc;
+    }, {});
+
+    return Object.entries(grouped).map(([name, val]) => ({
+      name,
+      quotations: val.quotations,
+      policies: val.policies,
+      value:
+        val.quotations === 0
+          ? 0
+          : Number(((val.policies / val.quotations) * 100).toFixed(1)),
+    }));
+  }, [filteredImportedRows]);
+
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const recordDate = monthToDate[record.month];
@@ -527,25 +580,6 @@ export default function DashboardPage() {
       return matchesDate && matchesBusiness;
     });
   }, [filters.businesses, filters.fromDate, filters.toDate]);
-
-  const conversionByLob = useMemo(() => {
-    return Object.values(
-      filteredRecords.reduce((acc, item) => {
-        if (!acc[item.lob]) {
-          acc[item.lob] = { name: item.lob, quotations: 0, policies: 0 };
-        }
-        acc[item.lob].quotations += item.quotations;
-        acc[item.lob].policies += item.convertedPolicies;
-        return acc;
-      }, {})
-    ).map((item) => ({
-      name: item.name,
-      value:
-        item.quotations === 0
-          ? 0
-          : Number(((item.policies / item.quotations) * 100).toFixed(1)),
-    }));
-  }, [filteredRecords]);
 
   const durationBuckets = useMemo(() => {
     return groupBy(filteredRecords, 'durationBucket', (r) => r.convertedPolicies);
@@ -590,33 +624,6 @@ export default function DashboardPage() {
     );
   }, [filteredRecords]);
 
-  const pipeline = useMemo(() => {
-    const leads = Math.round(metrics.quotations * 1.18);
-    const quotations = metrics.quotations;
-
-    const uw = sum(
-      filteredRecords.filter((r) =>
-        ['Pending UW', 'Approved', 'Converted', 'Rejected', 'Returned'].includes(r.status)
-      ),
-      (r) => r.quotations
-    );
-
-    const approved = sum(
-      filteredRecords.filter((r) => ['Approved', 'Converted'].includes(r.status)),
-      (r) => r.quotations
-    );
-
-    const issued = metrics.policies;
-
-    return [
-      { name: 'Leads', value: leads },
-      { name: 'Quotations', value: quotations },
-      { name: 'UW Review', value: uw },
-      { name: 'Approved', value: approved },
-      { name: 'Issued', value: issued },
-    ];
-  }, [filteredRecords, metrics]);
-
   return (
     <>
       <FilterBar filters={filters} onFilterChange={handleFilterChange} />
@@ -654,32 +661,51 @@ export default function DashboardPage() {
       </section>
 
       <section className="two-col">
-        <ChartCard title="Pipeline Overview">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={pipeline}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
         <ChartCard title="Quotations by Status">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={quotesByStatus}>
-              <CartesianGrid strokeDasharray="3 3" />
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={quotesByStatus} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis
                 dataKey="name"
                 interval={0}
                 angle={-35}
                 textAnchor="end"
-                height={90}
+                height={95}
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
               />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
+              <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+              <Tooltip
+                formatter={(value) => [value, 'Count']}
+                contentStyle={{
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                }}
+              />
+              <Bar dataKey="value" radius={[10, 10, 0, 0]} barSize={34} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Conversion Rate by Business">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={conversionByBusiness} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                unit="%"
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip content={<ConversionRateTooltip />} />
+              <Bar dataKey="value" radius={[10, 10, 0, 0]} barSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -720,18 +746,6 @@ export default function DashboardPage() {
       ) : null}
 
       <section className="three-col">
-        <ChartCard title="Conversion Rate by Line of Business">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={conversionByLob}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis unit="%" />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
         <ChartCard title="Policies Converted by Duration">
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={durationBuckets}>
