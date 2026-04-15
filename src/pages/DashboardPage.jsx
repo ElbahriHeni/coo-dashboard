@@ -804,7 +804,7 @@ export default function DashboardPage() {
         </section>
       ) : null}
 
-      <section className="one-col">
+      <section className="two-col">
         <ChartCard title="Policies Converted by Duration">
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={policiesConvertedByDuration} barCategoryGap="28%">
@@ -829,9 +829,7 @@ export default function DashboardPage() {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-      </section>
 
-      <section className="one-col">
         <ChartCard title="GWP by Region: Quotation vs Policies">
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={gwpByRegionQuotationVsPolicies} barGap={10} barCategoryGap="22%">
@@ -857,7 +855,7 @@ export default function DashboardPage() {
         </ChartCard>
       </section>
 
-      <section className="one-col">
+      <section className="two-col">
         <ChartCard title="GWP by Business: Quotation vs Policies">
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={gwpByBusinessQuotationVsPolicies} barGap={10} barCategoryGap="22%">
@@ -881,9 +879,7 @@ export default function DashboardPage() {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-      </section>
 
-      <section className="one-col">
         <ChartCard title="GWP by Source: Quotations vs Policies">
           <ResponsiveContainer width="100%" height={380}>
             <BarChart data={gwpBySourceQuotationVsPolicies} barGap={10} barCategoryGap="22%">
