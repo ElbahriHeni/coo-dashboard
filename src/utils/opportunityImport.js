@@ -3,6 +3,7 @@ export const OPPORTUNITY_COLUMNS = [
   'UsrSource',
   'UsrRenewalDate',
   'UsrEstGWP',
+  'UsrQuotationAmount',
   'UsrRegion',
   'UsrClient',
   'UsrSourceName',
@@ -79,10 +80,7 @@ export const normalizeBusinessValue = (value) => {
     return 'life';
   }
 
-  if (
-    normalized === 'general' ||
-    GENERAL_CLASS_NAMES.has(normalized)
-  ) {
+  if (normalized === 'general' || GENERAL_CLASS_NAMES.has(normalized)) {
     return 'general';
   }
 
@@ -337,7 +335,10 @@ export const applyDashboardFiltersToRows = (rows, filters = {}) => {
     const matchesClient = matchesTextFilter(row.UsrClient, client);
     const matchesClientType = matchesTextFilter(row.UsrClientType, clientType);
     const matchesRiskCategory = matchesTextFilter(row.UsrRiskCategory, riskCategory);
-    const matchesBusinesses = matchesMultiSelectFilter(row.UsrClass, businesses);
+    const matchesBusinesses = matchesMultiSelectFilter(
+      row['Business Mapping'] ?? row.UsrClass,
+      businesses
+    );
     const matchesLineOfBusiness = matchesTextFilter(row.UsrClass, lineOfBusiness);
     const matchesClass = matchesTextFilter(row.UsrClass, className);
     const matchesSubClass = matchesTextFilter(row.UsrSubClass, subClass);
