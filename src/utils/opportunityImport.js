@@ -41,6 +41,19 @@ export const normalizeText = (value) => String(value ?? '').trim();
 
 export const normalizeTextLower = (value) => normalizeText(value).toLowerCase();
 
+export const normalizeBusinessValue = (value) => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+
+  if (!normalized) return '';
+
+  if (normalized.includes('motor') || normalized.includes('mortor')) return 'motor';
+  if (normalized.includes('medical')) return 'medical';
+  if (normalized.includes('life')) return 'life';
+  if (normalized.includes('general')) return 'general';
+
+  return normalized;
+};
+
 export const normalizeDashboardDate = (value) => {
   const rawValue = String(value ?? '').trim();
   if (!rawValue) return '';
@@ -156,6 +169,15 @@ const matchesTextFilter = (rowValue, filterValue) => {
   return normalizeTextLower(rowValue) === normalizeTextLower(filterValue);
 };
 
+const matchesMultiSelectFilter = (rowValue, selectedValues) => {
+  if (!Array.isArray(selectedValues) || selectedValues.length === 0) return true;
+
+  const normalizedRowValue = normalizeBusinessValue(rowValue);
+  const normalizedSelections = selectedValues.map((value) => normalizeBusinessValue(value));
+
+  return normalizedSelections.includes(normalizedRowValue);
+};
+
 const matchesDateRange = (rowDateValue, fromDate, toDate) => {
   const normalizedRowDate = normalizeDashboardDate(rowDateValue);
 
@@ -166,11 +188,19 @@ const matchesDateRange = (rowDateValue, fromDate, toDate) => {
   const normalizedFromDate = normalizeDashboardDate(fromDate);
   const normalizedToDate = normalizeDashboardDate(toDate);
 
-  if (normalizedFromDate && /^\d{4}-\d{2}-\d{2}$/.test(normalizedFromDate) && normalizedRowDate < normalizedFromDate) {
+  if (
+    normalizedFromDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(normalizedFromDate) &&
+    normalizedRowDate < normalizedFromDate
+  ) {
     return false;
   }
 
-  if (normalizedToDate && /^\d{4}-\d{2}-\d{2}$/.test(normalizedToDate) && normalizedRowDate > normalizedToDate) {
+  if (
+    normalizedToDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(normalizedToDate) &&
+    normalizedRowDate > normalizedToDate
+  ) {
     return false;
   }
 
@@ -187,6 +217,7 @@ export const applyDashboardFiltersToRows = (rows, filters = {}) => {
     client,
     clientType,
     riskCategory,
+    businesses,
     lineOfBusiness,
     className,
     subClass,
@@ -209,6 +240,7 @@ export const applyDashboardFiltersToRows = (rows, filters = {}) => {
     const matchesClient = matchesTextFilter(row.UsrClient, client);
     const matchesClientType = matchesTextFilter(row.UsrClientType, clientType);
     const matchesRiskCategory = matchesTextFilter(row.UsrRiskCategory, riskCategory);
+    const matchesBusinesses = matchesMultiSelectFilter(row.UsrClass, businesses);
     const matchesLineOfBusiness = matchesTextFilter(row.UsrClass, lineOfBusiness);
     const matchesClass = matchesTextFilter(row.UsrClass, className);
     const matchesSubClass = matchesTextFilter(row.UsrSubClass, subClass);
@@ -228,6 +260,7 @@ export const applyDashboardFiltersToRows = (rows, filters = {}) => {
       matchesClient &&
       matchesClientType &&
       matchesRiskCategory &&
+      matchesBusinesses &&
       matchesLineOfBusiness &&
       matchesClass &&
       matchesSubClass &&
