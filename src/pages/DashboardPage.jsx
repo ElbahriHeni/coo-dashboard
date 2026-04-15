@@ -516,13 +516,17 @@ export default function DashboardPage() {
     });
   }, [filters.businesses, filters.fromDate, filters.toDate]);
 
-  const quotesByStatus = useMemo(() => {
-    return groupBy(
-      filteredRecords.filter((r) => r.status !== 'New'),
-      'status',
-      (r) => r.quotations
-    );
-  }, [filteredRecords]);
+const quotesByStatus = useMemo(() => {
+  const grouped = filteredImportedRows.reduce((acc, row) => {
+    const status = String(row.UsrStatus ?? '').trim() || 'Blank';
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(grouped)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+}, [filteredImportedRows]);
 
   const conversionByLob = useMemo(() => {
     return Object.values(
