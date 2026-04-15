@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import * as XLSX from 'xlsx';
 import {
   ResponsiveContainer,
   BarChart,
@@ -12,7 +13,6 @@ import {
 import KpiCard from '../components/KpiCard';
 import FilterBar from '../components/FilterBar';
 import ChartCard from '../components/ChartCard';
-import { records } from '../data/dashboardData';
 import {
   loadOpportunityImport,
   normalizeDashboardDate,
@@ -20,19 +20,16 @@ import {
   normalizeBusinessValue,
 } from '../utils/opportunityImport';
 
-const sum = (arr, selector) => arr.reduce((acc, item) => acc + selector(item), 0);
-
-const monthToDate = {
-  Jan: '2026-01-01',
-  Feb: '2026-02-01',
-  Mar: '2026-03-01',
-  Apr: '2026-04-01',
-  May: '2026-05-01',
-  Jun: '2026-06-01',
-};
-
-const minFilterDate = '2026-01-01';
-const maxFilterDate = '2026-06-30';
+const STATIC_CLASSEUR_URL = '/data/Classeur.xlsx';
+const CLASSEUR_QUOTATION_GROUPS = [
+  'Sales',
+  'CRC',
+  'UW',
+  'Reinsurance',
+  'Risk engineer',
+  'Doctor',
+];
+const CLASSEUR_POLICY_GROUPS = ['AML', 'Finance', 'Policy admin'];
 
 const POLICY_GWP_STATUSES = new Set([
   'aml screening pending',
@@ -45,15 +42,8 @@ const POLICY_GWP_STATUSES = new Set([
   'complete',
 ]);
 
-function groupBy(recordsList, key, valueSelector) {
-  return Object.entries(
-    recordsList.reduce((acc, item) => {
-      const group = item[key];
-      acc[group] = (acc[group] || 0) + valueSelector(item);
-      return acc;
-    }, {})
-  ).map(([name, value]) => ({ name, value }));
-}
+const minFilterDate = '2026-01-01';
+const maxFilterDate = '2026-06-30';
 
 const isValidIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ''));
 
@@ -68,6 +58,15 @@ const normalizeDashboardBusiness = (value) => {
   return '';
 };
 
+const normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();
+
+const normalizeGroupName = (value) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+
 const parseAmount = (value) => {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -81,10 +80,101 @@ const parseAmount = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();
+const normalizeClasseurDate = (value) => {
+  const rawValue = String(value ?? '').trim();
+  if (!rawValue) return '';
+
+  if (isValidIsoDate(rawValue)) {
+    return rawValue;
+  }
+
+  const match = rawValue.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})(?:\s|$)/);
+  if (match) {
+    return normalizeDashboardDate(`${match[1]}-${match[2]}-${match[3]}`);
+  }
+
+  return '';
+};
+
+const loadClasseurWorkbookRows = async () => {
+  const response = await fetch(`${STATIC_CLASSEUR_URL}?t=${Date.now()}`, {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Classeur workbook not found');
+  }
+
+  const buffer = await response.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+
+  return XLSX.utils.sheet_to_json(worksheet, {
+    defval: '',
+    raw: false,
+  });
+};
+
+const buildTatChartData = (rows, labels) => {
+  return labels.map((label) => {
+    const normalizedLabel = normalizeGroupName(label);
+
+    const matchingRows = rows.filter(
+      (row) => normalizeGroupName(row.UsrAssignToGroup) === normalizedLabel
+    );
+
+    const count = matchingRows.length;
+    const totalDays = matchingRows.reduce(
+      (acc, row) => acc + parseAmount(row.UsrTurnaroundDays),
+      0
+    );
+    const totalMinutes = matchingRows.reduce(
+      (acc, row) => acc + parseAmount(row.UsrTurnaroundTime),
+      0
+    );
+
+    return {
+      name: label,
+      count,
+      avgDays: count === 0 ? 0 : totalDays / count,
+      avgMinutes: count === 0 ? 0 : totalMinutes / count,
+    };
+  });
+};
+
+function TatTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  return (
+    <div
+      style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 12,
+        boxShadow: '0 10px 25px rgba(15, 23, 42, 0.08)',
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 8 }}>{label}</div>
+      <div>Count: {data.count}</div>
+      <div>Avg TAT (Days): {data.avgDays.toFixed(2)}</div>
+      <div>Avg TAT (Minutes): {data.avgMinutes.toFixed(2)}</div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const [importedWorkbook, setImportedWorkbook] = useState(() => loadOpportunityImport());
+  const [classeurRows, setClasseurRows] = useState([]);
+  const [isClasseurLoading, setIsClasseurLoading] = useState(false);
 
   const importedSheet =
     importedWorkbook?.workbookData?.sheets?.find(
@@ -94,20 +184,6 @@ export default function DashboardPage() {
     null;
 
   const importedRows = importedSheet?.rows ?? [];
-
-  const importedFilterDates = importedRows
-    .map((row) => normalizeDashboardDate(row.UsrQuoteSubmissionDate))
-    .filter((value) => isValidIsoDate(value))
-    .sort();
-
-  const effectiveMinDate = importedFilterDates[0] ?? minFilterDate;
-  const effectiveMaxDate = importedFilterDates[importedFilterDates.length - 1] ?? maxFilterDate;
-
-  const [filters, setFilters] = useState({
-    fromDate: effectiveMinDate,
-    toDate: effectiveMaxDate,
-    businesses: [],
-  });
 
   useEffect(() => {
     const syncImportedWorkbook = () => {
@@ -124,6 +200,42 @@ export default function DashboardPage() {
       window.removeEventListener('focus', syncImportedWorkbook);
     };
   }, []);
+
+  useEffect(() => {
+    const loadClasseur = async () => {
+      try {
+        setIsClasseurLoading(true);
+        const rows = await loadClasseurWorkbookRows();
+        setClasseurRows(rows);
+      } catch (error) {
+        console.error('Failed to load Classeur.xlsx', error);
+        setClasseurRows([]);
+      } finally {
+        setIsClasseurLoading(false);
+      }
+    };
+
+    loadClasseur();
+  }, []);
+
+  const allOppDates = importedRows
+    .map((row) => normalizeDashboardDate(row.UsrQuoteSubmissionDate))
+    .filter((value) => isValidIsoDate(value));
+
+  const classeurDates = classeurRows
+    .map((row) => normalizeClasseurDate(row.UsrRequestDateTimeIn))
+    .filter((value) => isValidIsoDate(value));
+
+  const combinedDates = [...allOppDates, ...classeurDates].sort();
+
+  const effectiveMinDate = combinedDates[0] ?? minFilterDate;
+  const effectiveMaxDate = combinedDates[combinedDates.length - 1] ?? maxFilterDate;
+
+  const [filters, setFilters] = useState({
+    fromDate: effectiveMinDate,
+    toDate: effectiveMaxDate,
+    businesses: [],
+  });
 
   useEffect(() => {
     setFilters((prev) => {
@@ -189,9 +301,30 @@ export default function DashboardPage() {
     });
   }, [filters.businesses, filters.fromDate, filters.toDate, importedRows]);
 
-  const quotationsCount = useMemo(() => {
-    return filteredImportedRows.length;
-  }, [filteredImportedRows]);
+  const filteredClasseurRows = useMemo(() => {
+    if (classeurRows.length === 0) return [];
+
+    return classeurRows.filter((row) => {
+      const requestDate = normalizeClasseurDate(row.UsrRequestDateTimeIn);
+      if (!isValidIsoDate(requestDate)) {
+        return false;
+      }
+
+      const matchesDate =
+        requestDate >= filters.fromDate && requestDate <= filters.toDate;
+
+      const mappedBusiness = normalizeDashboardBusiness(row.UsrBusiness);
+
+      const matchesBusiness =
+        !Array.isArray(filters.businesses) ||
+        filters.businesses.length === 0 ||
+        filters.businesses.includes(mappedBusiness);
+
+      return matchesDate && matchesBusiness;
+    });
+  }, [classeurRows, filters.businesses, filters.fromDate, filters.toDate]);
+
+  const quotationsCount = filteredImportedRows.length;
 
   const policiesConvertedCount = useMemo(() => {
     return filteredImportedRows.filter(
@@ -229,120 +362,13 @@ export default function DashboardPage() {
     };
   }, [quotationsCount, policiesConvertedCount, quotationsGwp, policiesGwp]);
 
-  const filteredRecords = useMemo(() => {
-    return records.filter((record) => {
-      const recordDate = monthToDate[record.month];
-      const matchesDate = recordDate >= filters.fromDate && recordDate <= filters.toDate;
+  const quotationsTatByDepartment = useMemo(() => {
+    return buildTatChartData(filteredClasseurRows, CLASSEUR_QUOTATION_GROUPS);
+  }, [filteredClasseurRows]);
 
-      const matchesBusiness =
-        !Array.isArray(filters.businesses) ||
-        filters.businesses.length === 0 ||
-        filters.businesses.includes(record.lob);
-
-      return matchesDate && matchesBusiness;
-    });
-  }, [filters.businesses, filters.fromDate, filters.toDate]);
-
-  const quotesByStatus = useMemo(() => {
-    return groupBy(
-      filteredRecords.filter((r) => r.status !== 'New'),
-      'status',
-      (r) => r.quotations
-    );
-  }, [filteredRecords]);
-
-  const assignedByDepartment = useMemo(() => {
-    return groupBy(filteredRecords, 'department', (r) => r.quotations);
-  }, [filteredRecords]);
-
-  const conversionByLob = useMemo(() => {
-    return Object.values(
-      filteredRecords.reduce((acc, item) => {
-        if (!acc[item.lob]) {
-          acc[item.lob] = { name: item.lob, quotations: 0, policies: 0 };
-        }
-        acc[item.lob].quotations += item.quotations;
-        acc[item.lob].policies += item.convertedPolicies;
-        return acc;
-      }, {})
-    ).map((item) => ({
-      name: item.name,
-      value:
-        item.quotations === 0
-          ? 0
-          : Number(((item.policies / item.quotations) * 100).toFixed(1)),
-    }));
-  }, [filteredRecords]);
-
-  const durationBuckets = useMemo(() => {
-    return groupBy(filteredRecords, 'durationBucket', (r) => r.convertedPolicies);
-  }, [filteredRecords]);
-
-  const gwpComparisonByRegion = useMemo(() => {
-    return Object.values(
-      filteredRecords.reduce((acc, item) => {
-        if (!acc[item.region]) {
-          acc[item.region] = { name: item.region, actual: 0, target: 0 };
-        }
-        acc[item.region].actual += item.actualGwp;
-        acc[item.region].target += item.expectedGwp;
-        return acc;
-      }, {})
-    );
-  }, [filteredRecords]);
-
-  const gwpComparisonByBusiness = useMemo(() => {
-    return Object.values(
-      filteredRecords.reduce((acc, item) => {
-        if (!acc[item.lob]) {
-          acc[item.lob] = { name: item.lob, actual: 0, target: 0 };
-        }
-        acc[item.lob].actual += item.actualGwp;
-        acc[item.lob].target += item.expectedGwp;
-        return acc;
-      }, {})
-    );
-  }, [filteredRecords]);
-
-  const gwpComparisonBySource = useMemo(() => {
-    return Object.values(
-      filteredRecords.reduce((acc, item) => {
-        if (!acc[item.source]) {
-          acc[item.source] = { name: item.source, actual: 0, target: 0 };
-        }
-        acc[item.source].actual += item.actualGwp;
-        acc[item.source].target += item.expectedGwp;
-        return acc;
-      }, {})
-    );
-  }, [filteredRecords]);
-
-  const pipeline = useMemo(() => {
-    const leads = Math.round(metrics.quotations * 1.18);
-    const quotations = metrics.quotations;
-
-    const uw = sum(
-      filteredRecords.filter((r) =>
-        ['Pending UW', 'Approved', 'Converted', 'Rejected', 'Returned'].includes(r.status)
-      ),
-      (r) => r.quotations
-    );
-
-    const approved = sum(
-      filteredRecords.filter((r) => ['Approved', 'Converted'].includes(r.status)),
-      (r) => r.quotations
-    );
-
-    const issued = metrics.policies;
-
-    return [
-      { name: 'Leads', value: leads },
-      { name: 'Quotations', value: quotations },
-      { name: 'UW Review', value: uw },
-      { name: 'Approved', value: approved },
-      { name: 'Issued', value: issued },
-    ];
-  }, [filteredRecords, metrics]);
+  const policiesTatByDepartment = useMemo(() => {
+    return buildTatChartData(filteredClasseurRows, CLASSEUR_POLICY_GROUPS);
+  }, [filteredClasseurRows]);
 
   return (
     <>
@@ -381,129 +407,38 @@ export default function DashboardPage() {
       </section>
 
       <section className="two-col">
-        <ChartCard title="Pipeline Overview">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={pipeline}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Quotations by Status">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={quotesByStatus}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </section>
-
-      <section className="three-col">
-        <ChartCard title="Assigned to Each Department">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={assignedByDepartment} layout="vertical" margin={{ left: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis type="category" dataKey="name" width={100} />
-              <Tooltip />
-              <Bar dataKey="value" radius={[0, 8, 8, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Conversion Rate by Line of Business">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={conversionByLob}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis unit="%" />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="Policies Converted by Duration">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={durationBuckets}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </section>
-
-      <section className="two-col">
-        <ChartCard title="GWP by Region: Actual vs Target">
+        <ChartCard title="Quotations TAT by Department">
           <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpComparisonByRegion} barGap={10}>
+            <BarChart data={quotationsTatByDepartment}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
+              <XAxis dataKey="name" interval={0} angle={-10} textAnchor="end" height={60} />
               <YAxis />
-              <Legend />
-              <Tooltip
-                formatter={(value, name) => [
-                  `SAR ${value.toLocaleString()}`,
-                  name === 'actual' ? 'Actual GWP' : 'Target GWP',
-                ]}
-              />
-              <Bar dataKey="actual" name="Actual GWP" fill="#1d4ed8" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="target" name="Target GWP" fill="#94a3b8" radius={[8, 8, 0, 0]} />
+              <Tooltip content={<TatTooltip />} />
+              <Bar dataKey="count" name="Count" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Policies TAT by Department">
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={policiesTatByDepartment}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" interval={0} angle={-10} textAnchor="end" height={60} />
+              <YAxis />
+              <Tooltip content={<TatTooltip />} />
+              <Bar dataKey="count" name="Count" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </section>
 
-      <section className="two-col">
-        <ChartCard title="GWP by Business: Actual vs Target">
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpComparisonByBusiness} barGap={10}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Legend />
-              <Tooltip
-                formatter={(value, name) => [
-                  `SAR ${value.toLocaleString()}`,
-                  name === 'actual' ? 'Actual GWP' : 'Target GWP',
-                ]}
-              />
-              <Bar dataKey="actual" name="Actual GWP" fill="#1d4ed8" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="target" name="Target GWP" fill="#94a3b8" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        <ChartCard title="GWP by Source: Actual vs Target">
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpComparisonBySource} barGap={10}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Legend />
-              <Tooltip
-                formatter={(value, name) => [
-                  `SAR ${value.toLocaleString()}`,
-                  name === 'actual' ? 'Actual GWP' : 'Target GWP',
-                ]}
-              />
-              <Bar dataKey="actual" name="Actual GWP" fill="#1d4ed8" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="target" name="Target GWP" fill="#94a3b8" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </section>
+      {isClasseurLoading ? (
+        <section className="two-col">
+          <ChartCard title="Loading Classeur TAT Data">
+            <div style={{ padding: '24px 8px' }}>Loading Classeur.xlsx...</div>
+          </ChartCard>
+        </section>
+      ) : null}
     </>
   );
 }
