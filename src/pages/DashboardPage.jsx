@@ -12,7 +12,7 @@ import {
 import KpiCard from '../components/KpiCard';
 import FilterBar from '../components/FilterBar';
 import ChartCard from '../components/ChartCard';
-import { records, targets } from '../data/dashboardData';
+import { records } from '../data/dashboardData';
 import {
   loadOpportunityImport,
   normalizeDashboardDate,
@@ -212,6 +212,23 @@ export default function DashboardPage() {
       .reduce((acc, row) => acc + parseAmount(row.UsrQuotationAmount), 0);
   }, [filteredImportedRows]);
 
+  const metrics = useMemo(() => {
+    const quotations = quotationsCount;
+    const policies = policiesConvertedCount;
+    const conversionRate = quotations === 0 ? 0 : (policies / quotations) * 100;
+    const gwpConversionRate =
+      quotationsGwp === 0 ? 0 : (policiesGwp / quotationsGwp) * 100;
+
+    return {
+      quotations,
+      policies,
+      conversionRate,
+      quotationsGwp,
+      policiesGwp,
+      gwpConversionRate,
+    };
+  }, [quotationsCount, policiesConvertedCount, quotationsGwp, policiesGwp]);
+
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const recordDate = monthToDate[record.month];
@@ -225,38 +242,6 @@ export default function DashboardPage() {
       return matchesDate && matchesBusiness;
     });
   }, [filters.businesses, filters.fromDate, filters.toDate]);
-
-  const metrics = useMemo(() => {
-    const quotations =
-      importedRows.length > 0 ? quotationsCount : sum(filteredRecords, (r) => r.quotations);
-
-    const policies =
-      importedRows.length > 0
-        ? policiesConvertedCount
-        : sum(filteredRecords, (r) => r.convertedPolicies);
-
-    const conversionRate = quotations === 0 ? 0 : (policies / quotations) * 100;
-
-    const quotationsGwpValue =
-      importedRows.length > 0
-        ? quotationsGwp
-        : sum(filteredRecords.filter((r) => r.lob === 'Motor'), (r) => r.expectedGwp);
-
-    return {
-      quotations,
-      policies,
-      conversionRate,
-      quotationsGwp: quotationsGwpValue,
-      policiesGwp,
-    };
-  }, [
-    filteredRecords,
-    importedRows.length,
-    quotationsCount,
-    policiesConvertedCount,
-    quotationsGwp,
-    policiesGwp,
-  ]);
 
   const quotesByStatus = useMemo(() => {
     return groupBy(
@@ -363,38 +348,34 @@ export default function DashboardPage() {
     <>
       <FilterBar filters={filters} onFilterChange={handleFilterChange} />
 
-      <section className="kpi-grid kpi-grid-five">
-        <KpiCard
-          title="Quotations"
-          value={metrics.quotations}
-          target={targets.quotations}
-          showTarget={false}
-        />
-        <KpiCard
-          title="Policies Converted"
-          value={metrics.policies}
-          target={targets.policies}
-          showTarget={false}
-        />
+      <section className="kpi-grid kpi-grid-three">
+        <KpiCard title="Quotations" value={metrics.quotations} showTarget={false} />
+        <KpiCard title="Policies Converted" value={metrics.policies} showTarget={false} />
         <KpiCard
           title="Conversion Rate"
           value={metrics.conversionRate}
-          target={targets.conversionRate}
           suffix="%"
           showTarget={false}
         />
+      </section>
+
+      <section className="kpi-grid kpi-grid-three">
         <KpiCard
           title="Quotations GWP"
           value={metrics.quotationsGwp}
-          target={targets.expectedGwpMotor}
           currency
           showTarget={false}
         />
         <KpiCard
           title="Policies GWP"
           value={metrics.policiesGwp}
-          target={0}
           currency
+          showTarget={false}
+        />
+        <KpiCard
+          title="GWP Conversion Rate"
+          value={metrics.gwpConversionRate}
+          suffix="%"
           showTarget={false}
         />
       </section>
