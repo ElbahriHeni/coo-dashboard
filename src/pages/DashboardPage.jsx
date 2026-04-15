@@ -16,13 +16,9 @@ import {
 import KpiCard from '../components/KpiCard';
 import FilterBar from '../components/FilterBar';
 import ChartCard from '../components/ChartCard';
-import {
-  loadOpportunityImport,
-  normalizeDashboardDate,
-  OPPORTUNITY_IMPORT_EVENT,
-  normalizeBusinessValue,
-} from '../utils/opportunityImport';
+import { normalizeBusinessValue, normalizeDashboardDate } from '../utils/opportunityImport';
 
+const STATIC_ALL_OPP_URL = '/data/AllOppQDR.xlsx';
 const STATIC_CLASSEUR_URL = '/data/Classeur.xlsx';
 
 const minFilterDate = '2026-01-01';
@@ -49,6 +45,15 @@ const isValidIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? '')
 
 const normalizeDashboardBusiness = (value) => {
   const normalized = normalizeBusinessValue(value);
+  if (normalized === 'motor') return 'Motor';
+  if (normalized === 'medical') return 'Medical';
+  if (normalized === 'life') return 'Life';
+  if (normalized === 'general') return 'General';
+  return '';
+};
+
+const normalizeBusinessFromUsrClass = (usrClassValue) => {
+  const normalized = normalizeBusinessValue(usrClassValue);
   if (normalized === 'motor') return 'Motor';
   if (normalized === 'medical') return 'Medical';
   if (normalized === 'life') return 'Life';
@@ -149,9 +154,7 @@ const normalizeClasseurDate = (value) => {
   const rawValue = String(value ?? '').trim();
   if (!rawValue) return '';
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
-    return rawValue;
-  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) return rawValue;
 
   const match = rawValue.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})/);
   if (!match) return '';
@@ -177,6 +180,21 @@ const normalizeClasseurDate = (value) => {
 
   const year = yearToken.length === 2 ? `20${yearToken}` : yearToken.padStart(4, '0');
   return `${year}-${month}-${day.padStart(2, '0')}`;
+};
+
+const formatMillions = (value) => {
+  const num = Number(value) || 0;
+  if (Math.abs(num) >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+  if (Math.abs(num) >= 1_000_000) return `${(num / 1_000_000).toFixed(0)}M`;
+  if (Math.abs(num) >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
+  return `${num}`;
+};
+
+const formatSourceAxisLabel = (value) => {
+  const raw = String(value ?? '').trim();
+  if (raw.toLowerCase() === 'corporate sales. director/ country manager') return 'Corporate Sales';
+  if (raw.length > 18) return `${raw.slice(0, 16)}…`;
+  return raw;
 };
 
 const buildQuotationTatDataset = (rows, groups) =>
@@ -245,40 +263,13 @@ const buildPolicyTatDataset = (rows, groups) =>
     };
   });
 
-const formatMillions = (value) => {
-  const num = Number(value) || 0;
-  if (Math.abs(num) >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
-  if (Math.abs(num) >= 1_000_000) return `${(num / 1_000_000).toFixed(0)}M`;
-  if (Math.abs(num) >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
-  return `${num}`;
-};
-
-const formatSourceAxisLabel = (value) => {
-  const raw = String(value ?? '').trim();
-  if (raw.toLowerCase() === 'corporate sales. director/ country manager') {
-    return 'Corporate Sales';
-  }
-  if (raw.length > 18) {
-    return `${raw.slice(0, 16)}…`;
-  }
-  return raw;
-};
-
 const TatTooltip = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
   const data = payload[0]?.payload;
   if (!data) return null;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 12,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
-      }}
-    >
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <div>Count: {data.count}</div>
       <div>Avg TAT Days: {data.avgDays}</div>
@@ -293,15 +284,7 @@ const ConversionRateTooltip = ({ active, payload, label }) => {
   if (!data) return null;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 12,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
-      }}
-    >
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <div>Quotations: {data.quotations}</div>
       <div>Complete: {data.policies}</div>
@@ -316,15 +299,7 @@ const ActionPieTooltip = ({ active, payload }) => {
   if (!data) return null;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 12,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
-      }}
-    >
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{data.name}</div>
       <div>Count: {data.value}</div>
     </div>
@@ -335,15 +310,7 @@ const GwpTooltip = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div
-      style={{
-        background: 'white',
-        border: '1px solid #e2e8f0',
-        borderRadius: 12,
-        padding: 12,
-        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
-      }}
-    >
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       {payload.map((entry) => (
         <div key={entry.dataKey}>
@@ -355,73 +322,77 @@ const GwpTooltip = ({ active, payload, label }) => {
 };
 
 export default function DashboardPage() {
-  const [importedWorkbook, setImportedWorkbook] = useState(() => loadOpportunityImport());
+  const [allOppRows, setAllOppRows] = useState([]);
   const [classeurRows, setClasseurRows] = useState([]);
+  const [allOppError, setAllOppError] = useState('');
   const [classeurError, setClasseurError] = useState('');
 
-  const importedSheet =
-    importedWorkbook?.workbookData?.sheets?.find(
-      (sheet) => sheet.name === importedWorkbook?.activeSheet
-    ) ??
-    importedWorkbook?.workbookData?.sheets?.[0] ??
-    null;
-
-  const importedRows = importedSheet?.rows ?? [];
-
-  const importedFilterDates = importedRows
+  const allOppDates = allOppRows
     .map((row) => normalizeDashboardDate(row.UsrQuoteSubmissionDate))
     .filter((value) => isValidIsoDate(value))
     .sort();
 
-  const effectiveMinDate = importedFilterDates[0] ?? minFilterDate;
-  const effectiveMaxDate = importedFilterDates[importedFilterDates.length - 1] ?? maxFilterDate;
+  const effectiveMinDate = allOppDates[0] ?? minFilterDate;
+  const effectiveMaxDate = allOppDates[allOppDates.length - 1] ?? maxFilterDate;
 
   const [filters, setFilters] = useState({
-    fromDate: effectiveMinDate,
-    toDate: effectiveMaxDate,
+    fromDate: minFilterDate,
+    toDate: maxFilterDate,
     businesses: [],
   });
 
   useEffect(() => {
-    const syncImportedWorkbook = () => {
-      setImportedWorkbook(loadOpportunityImport());
+    const loadAllOppWorkbook = async () => {
+      try {
+        setAllOppError('');
+        const response = await fetch(`${STATIC_ALL_OPP_URL}?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+        });
+
+        if (!response.ok) throw new Error('AllOppQDR workbook not found');
+
+        const buffer = await response.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false });
+
+        const normalizedRows = rawRows.map((row) => ({
+          ...row,
+          UsrQuoteSubmissionDate: normalizeDashboardDate(row.UsrQuoteSubmissionDate),
+          'Business Mapping':
+            String(row['Business Mapping'] ?? '').trim() ||
+            normalizeBusinessFromUsrClass(row.UsrClass),
+        }));
+
+        setAllOppRows(normalizedRows);
+      } catch {
+        setAllOppRows([]);
+        setAllOppError('AllOppQDR workbook could not be loaded.');
+      }
     };
 
-    window.addEventListener(OPPORTUNITY_IMPORT_EVENT, syncImportedWorkbook);
-    window.addEventListener('storage', syncImportedWorkbook);
-    window.addEventListener('focus', syncImportedWorkbook);
-
-    return () => {
-      window.removeEventListener(OPPORTUNITY_IMPORT_EVENT, syncImportedWorkbook);
-      window.removeEventListener('storage', syncImportedWorkbook);
-      window.removeEventListener('focus', syncImportedWorkbook);
-    };
+    loadAllOppWorkbook();
   }, []);
 
   useEffect(() => {
     const loadClasseurWorkbook = async () => {
       try {
         setClasseurError('');
-
         const response = await fetch(`${STATIC_CLASSEUR_URL}?t=${Date.now()}`, {
           cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            Pragma: 'no-cache',
-          },
+          headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
         });
 
-        if (!response.ok) {
-          throw new Error('Classeur workbook not found');
-        }
+        if (!response.ok) throw new Error('Classeur workbook not found');
 
         const buffer = await response.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const firstSheet = workbook.Sheets[firstSheetName];
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawRows = XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false });
+
         setClasseurRows(rawRows);
-      } catch (error) {
+      } catch {
         setClasseurRows([]);
         setClasseurError('Classeur workbook could not be loaded.');
       }
@@ -446,10 +417,7 @@ export default function DashboardPage() {
         return { ...prev, fromDate: effectiveMinDate, toDate: effectiveMaxDate };
       }
 
-      if (nextFrom === prev.fromDate && nextTo === prev.toDate) {
-        return prev;
-      }
-
+      if (nextFrom === prev.fromDate && nextTo === prev.toDate) return prev;
       return { ...prev, fromDate: nextFrom, toDate: nextTo };
     });
   }, [effectiveMinDate, effectiveMaxDate]);
@@ -459,14 +427,17 @@ export default function DashboardPage() {
   };
 
   const filteredImportedRows = useMemo(() => {
-    if (importedRows.length === 0) return [];
+    if (allOppRows.length === 0) return [];
 
-    return importedRows.filter((row) => {
+    return allOppRows.filter((row) => {
       const submissionDate = normalizeDashboardDate(row.UsrQuoteSubmissionDate);
       if (!isValidIsoDate(submissionDate)) return false;
 
       const matchesDate = submissionDate >= filters.fromDate && submissionDate <= filters.toDate;
-      const mappedBusiness = normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass);
+      const mappedBusiness = normalizeDashboardBusiness(
+        row['Business Mapping'] ?? row.UsrClass
+      );
+
       const matchesBusiness =
         !Array.isArray(filters.businesses) ||
         filters.businesses.length === 0 ||
@@ -474,7 +445,7 @@ export default function DashboardPage() {
 
       return matchesDate && matchesBusiness;
     });
-  }, [filters.businesses, filters.fromDate, filters.toDate, importedRows]);
+  }, [allOppRows, filters.businesses, filters.fromDate, filters.toDate]);
 
   const filteredClasseurRows = useMemo(() => {
     if (classeurRows.length === 0) return [];
@@ -485,6 +456,7 @@ export default function DashboardPage() {
 
       const matchesDate = requestDate >= filters.fromDate && requestDate <= filters.toDate;
       const mappedBusiness = normalizeDashboardBusiness(row.UsrBusiness);
+
       const matchesBusiness =
         !Array.isArray(filters.businesses) ||
         filters.businesses.length === 0 ||
@@ -576,8 +548,8 @@ export default function DashboardPage() {
         normalizeDashboardBusiness(row['Business Mapping'] ?? row.UsrClass) || 'Unknown';
 
       if (!acc[business]) acc[business] = { quotations: 0, policies: 0 };
-
       acc[business].quotations += 1;
+
       if (normalizeStatus(row.UsrStatus) === 'complete') {
         acc[business].policies += 1;
       }
@@ -589,7 +561,10 @@ export default function DashboardPage() {
       name,
       quotations: val.quotations,
       policies: val.policies,
-      value: val.quotations === 0 ? 0 : Number(((val.policies / val.quotations) * 100).toFixed(1)),
+      value:
+        val.quotations === 0
+          ? 0
+          : Number(((val.policies / val.quotations) * 100).toFixed(1)),
     }));
   }, [filteredImportedRows]);
 
@@ -689,6 +664,15 @@ export default function DashboardPage() {
   return (
     <>
       <FilterBar filters={filters} onFilterChange={handleFilterChange} />
+
+      {(allOppError || classeurError) ? (
+        <section className="one-col">
+          <div className="card" style={{ padding: 20 }}>
+            {allOppError ? <div><strong>{allOppError}</strong></div> : null}
+            {classeurError ? <div><strong>{classeurError}</strong></div> : null}
+          </div>
+        </section>
+      ) : null}
 
       <section className="kpi-grid kpi-grid-three">
         <KpiCard title="Quotations" value={metrics.quotations} showTarget={false} />
@@ -793,14 +777,6 @@ export default function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>
-        </section>
-      ) : null}
-
-      {classeurError ? (
-        <section className="one-col">
-          <div className="card" style={{ padding: 20 }}>
-            <strong>{classeurError}</strong>
-          </div>
         </section>
       ) : null}
 
