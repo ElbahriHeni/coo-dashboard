@@ -57,6 +57,19 @@ const normalizeDashboardBusiness = (value) => {
   return '';
 };
 
+const parseAmount = (value) => {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+  const normalized = String(value)
+    .replace(/,/g, '')
+    .replace(/\s/g, '')
+    .trim();
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export default function DashboardPage() {
   const [importedWorkbook, setImportedWorkbook] = useState(() => loadOpportunityImport());
 
@@ -176,6 +189,13 @@ export default function DashboardPage() {
     ).length;
   }, [filteredImportedRows]);
 
+  const gwpAmount = useMemo(() => {
+    return filteredImportedRows.reduce(
+      (acc, row) => acc + parseAmount(row.UsrQuotationAmount),
+      0
+    );
+  }, [filteredImportedRows]);
+
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const recordDate = monthToDate[record.month];
@@ -212,18 +232,18 @@ export default function DashboardPage() {
 
     const conversionRate = quotations === 0 ? 0 : (policies / quotations) * 100;
 
-    const expectedGwpMotor = sum(
-      filteredRecords.filter((r) => r.lob === 'Motor'),
-      (r) => r.expectedGwp
-    );
+    const gwp =
+      importedRows.length > 0
+        ? gwpAmount
+        : sum(filteredRecords.filter((r) => r.lob === 'Motor'), (r) => r.expectedGwp);
 
     return {
       quotations,
       policies,
       conversionRate,
-      expectedGwpMotor,
+      gwp,
     };
-  }, [filteredRecords, importedRows.length, quotationsCount, policiesConvertedCount]);
+  }, [filteredRecords, importedRows.length, quotationsCount, policiesConvertedCount, gwpAmount]);
 
   const quotesByStatus = useMemo(() => {
     return groupBy(
@@ -369,10 +389,11 @@ export default function DashboardPage() {
           showTarget={false}
         />
         <KpiCard
-          title="Expected GWP"
-          value={metrics.expectedGwpMotor}
+          title="GWP"
+          value={metrics.gwp}
           target={targets.expectedGwpMotor}
           currency
+          showTarget={false}
         />
       </section>
 
