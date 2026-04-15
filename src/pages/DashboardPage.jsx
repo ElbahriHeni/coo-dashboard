@@ -34,6 +34,17 @@ const monthToDate = {
 const minFilterDate = '2026-01-01';
 const maxFilterDate = '2026-06-30';
 
+const POLICY_GWP_STATUSES = new Set([
+  'aml screening pending',
+  'customer creation in progress',
+  'customer creation pending',
+  'policy generation in-progress',
+  'policy generation pending',
+  'returned by finance',
+  'uw clearance in-progress',
+  'complete',
+]);
+
 function groupBy(recordsList, key, valueSelector) {
   return Object.entries(
     recordsList.reduce((acc, item) => {
@@ -70,6 +81,8 @@ const parseAmount = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const normalizeStatus = (value) => String(value ?? '').trim().toLowerCase();
+
 export default function DashboardPage() {
   const [importedWorkbook, setImportedWorkbook] = useState(() => loadOpportunityImport());
 
@@ -93,9 +106,6 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState({
     fromDate: effectiveMinDate,
     toDate: effectiveMaxDate,
-    region: 'All',
-    source: 'All',
-    department: 'All',
     businesses: [],
   });
 
@@ -185,15 +195,21 @@ export default function DashboardPage() {
 
   const policiesConvertedCount = useMemo(() => {
     return filteredImportedRows.filter(
-      (row) => String(row.UsrStatus ?? '').trim().toLowerCase() === 'complete'
+      (row) => normalizeStatus(row.UsrStatus) === 'complete'
     ).length;
   }, [filteredImportedRows]);
 
-  const gwpAmount = useMemo(() => {
+  const quotationsGwp = useMemo(() => {
     return filteredImportedRows.reduce(
       (acc, row) => acc + parseAmount(row.UsrQuotationAmount),
       0
     );
+  }, [filteredImportedRows]);
+
+  const policiesGwp = useMemo(() => {
+    return filteredImportedRows
+      .filter((row) => POLICY_GWP_STATUSES.has(normalizeStatus(row.UsrStatus)))
+      .reduce((acc, row) => acc + parseAmount(row.UsrQuotationAmount), 0);
   }, [filteredImportedRows]);
 
   const filteredRecords = useMemo(() => {
@@ -201,25 +217,14 @@ export default function DashboardPage() {
       const recordDate = monthToDate[record.month];
       const matchesDate = recordDate >= filters.fromDate && recordDate <= filters.toDate;
 
-      const matchesRegion =
-        !filters.region || filters.region === 'All' || record.region === filters.region;
-
-      const matchesSource =
-        !filters.source || filters.source === 'All' || record.source === filters.source;
-
-      const matchesDepartment =
-        !filters.department ||
-        filters.department === 'All' ||
-        record.department === filters.department;
-
       const matchesBusiness =
         !Array.isArray(filters.businesses) ||
         filters.businesses.length === 0 ||
         filters.businesses.includes(record.lob);
 
-      return matchesDate && matchesRegion && matchesSource && matchesDepartment && matchesBusiness;
+      return matchesDate && matchesBusiness;
     });
-  }, [filters]);
+  }, [filters.businesses, filters.fromDate, filters.toDate]);
 
   const metrics = useMemo(() => {
     const quotations =
@@ -232,18 +237,26 @@ export default function DashboardPage() {
 
     const conversionRate = quotations === 0 ? 0 : (policies / quotations) * 100;
 
-    const gwp =
+    const quotationsGwpValue =
       importedRows.length > 0
-        ? gwpAmount
+        ? quotationsGwp
         : sum(filteredRecords.filter((r) => r.lob === 'Motor'), (r) => r.expectedGwp);
 
     return {
       quotations,
       policies,
       conversionRate,
-      gwp,
+      quotationsGwp: quotationsGwpValue,
+      policiesGwp,
     };
-  }, [filteredRecords, importedRows.length, quotationsCount, policiesConvertedCount, gwpAmount]);
+  }, [
+    filteredRecords,
+    importedRows.length,
+    quotationsCount,
+    policiesConvertedCount,
+    quotationsGwp,
+    policiesGwp,
+  ]);
 
   const quotesByStatus = useMemo(() => {
     return groupBy(
@@ -346,29 +359,11 @@ export default function DashboardPage() {
     ];
   }, [filteredRecords, metrics]);
 
-  const availableRegions = useMemo(() => {
-    return [...new Set(records.map((item) => item.region).filter(Boolean))].sort();
-  }, []);
-
-  const availableSources = useMemo(() => {
-    return [...new Set(records.map((item) => item.source).filter(Boolean))].sort();
-  }, []);
-
-  const availableDepartments = useMemo(() => {
-    return [...new Set(records.map((item) => item.department).filter(Boolean))].sort();
-  }, []);
-
   return (
     <>
-      <FilterBar
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        regions={availableRegions}
-        sources={availableSources}
-        departments={availableDepartments}
-      />
+      <FilterBar filters={filters} onFilterChange={handleFilterChange} />
 
-      <section className="kpi-grid">
+      <section className="kpi-grid kpi-grid-five">
         <KpiCard
           title="Quotations"
           value={metrics.quotations}
@@ -389,9 +384,16 @@ export default function DashboardPage() {
           showTarget={false}
         />
         <KpiCard
-          title="GWP"
-          value={metrics.gwp}
+          title="Quotations GWP"
+          value={metrics.quotationsGwp}
           target={targets.expectedGwpMotor}
+          currency
+          showTarget={false}
+        />
+        <KpiCard
+          title="Policies GWP"
+          value={metrics.policiesGwp}
+          target={0}
           currency
           showTarget={false}
         />
