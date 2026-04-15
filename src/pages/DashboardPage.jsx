@@ -502,6 +502,18 @@ export default function DashboardPage() {
     };
   }, [quotationsCount, policiesConvertedCount, quotationsGwp, policiesGwp]);
 
+  const quotesByStatus = useMemo(() => {
+    const grouped = filteredImportedRows.reduce((acc, row) => {
+      const status = String(row.UsrStatus ?? '').trim() || 'Blank';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredImportedRows]);
+
   const filteredRecords = useMemo(() => {
     return records.filter((record) => {
       const recordDate = monthToDate[record.month];
@@ -515,18 +527,6 @@ export default function DashboardPage() {
       return matchesDate && matchesBusiness;
     });
   }, [filters.businesses, filters.fromDate, filters.toDate]);
-
-const quotesByStatus = useMemo(() => {
-  const grouped = filteredImportedRows.reduce((acc, row) => {
-    const status = String(row.UsrStatus ?? '').trim() || 'Blank';
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {});
-
-  return Object.entries(grouped)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-}, [filteredImportedRows]);
 
   const conversionByLob = useMemo(() => {
     return Object.values(
@@ -658,13 +658,7 @@ const quotesByStatus = useMemo(() => {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={pipeline}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-              dataKey="name"
-              interval={0}
-              angle={-35}
-              textAnchor="end"
-              height={90}
-              />
+              <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} />
@@ -676,7 +670,13 @@ const quotesByStatus = useMemo(() => {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={quotesByStatus}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
+              <XAxis
+                dataKey="name"
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                height={90}
+              />
               <YAxis />
               <Tooltip />
               <Bar dataKey="value" radius={[8, 8, 0, 0]} />
