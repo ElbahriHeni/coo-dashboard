@@ -16,7 +16,12 @@ import {
 import KpiCard from '../components/KpiCard';
 import FilterBar from '../components/FilterBar';
 import ChartCard from '../components/ChartCard';
-import { loadOpportunityImport, normalizeDashboardDate, OPPORTUNITY_IMPORT_EVENT, normalizeBusinessValue } from '../utils/opportunityImport';
+import {
+  loadOpportunityImport,
+  normalizeDashboardDate,
+  OPPORTUNITY_IMPORT_EVENT,
+  normalizeBusinessValue,
+} from '../utils/opportunityImport';
 
 const STATIC_CLASSEUR_URL = '/data/Classeur.xlsx';
 
@@ -240,6 +245,25 @@ const buildPolicyTatDataset = (rows, groups) =>
     };
   });
 
+const formatMillions = (value) => {
+  const num = Number(value) || 0;
+  if (Math.abs(num) >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+  if (Math.abs(num) >= 1_000_000) return `${(num / 1_000_000).toFixed(0)}M`;
+  if (Math.abs(num) >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
+  return `${num}`;
+};
+
+const formatSourceAxisLabel = (value) => {
+  const raw = String(value ?? '').trim();
+  if (raw.toLowerCase() === 'corporate sales. director/ country manager') {
+    return 'Corporate Sales';
+  }
+  if (raw.length > 18) {
+    return `${raw.slice(0, 16)}…`;
+  }
+  return raw;
+};
+
 const TatTooltip = ({ active, payload, label }) => {
   if (!active || !payload || payload.length === 0) return null;
   const data = payload[0]?.payload;
@@ -303,6 +327,29 @@ const ActionPieTooltip = ({ active, payload }) => {
     >
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{data.name}</div>
       <div>Count: {data.value}</div>
+    </div>
+  );
+};
+
+const GwpTooltip = ({ active, payload, label }) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 12,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
+      {payload.map((entry) => (
+        <div key={entry.dataKey}>
+          {entry.name}: SAR {Number(entry.value).toLocaleString()}
+        </div>
+      ))}
     </div>
   );
 };
@@ -757,76 +804,111 @@ export default function DashboardPage() {
         </section>
       ) : null}
 
-      <section className="three-col">
+      <section className="one-col">
         <ChartCard title="Policies Converted by Duration">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={policiesConvertedByDuration}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(value) => [value, 'Count']} />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]} />
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={policiesConvertedByDuration} barCategoryGap="28%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 13, fontWeight: 600 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                formatter={(value) => [value, 'Count']}
+                contentStyle={{ borderRadius: '10px', border: '1px solid #e2e8f0' }}
+              />
+              <Bar dataKey="value" radius={[10, 10, 0, 0]} barSize={52} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </section>
 
-      <section className="two-col">
+      <section className="one-col">
         <ChartCard title="GWP by Region: Quotation vs Policies">
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpByRegionQuotationVsPolicies} barGap={10}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Legend />
-              <Tooltip
-                formatter={(value, name) => [
-                  `SAR ${Number(value).toLocaleString()}`,
-                  name === 'quotation' ? 'Quotation GWP' : 'Policies GWP',
-                ]}
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={gwpByRegionQuotationVsPolicies} barGap={10} barCategoryGap="22%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 12, fontWeight: 600 }}
+                axisLine={false}
+                tickLine={false}
               />
-              <Bar dataKey="quotation" name="Quotation GWP" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="policies" name="Policies GWP" radius={[8, 8, 0, 0]} />
+              <YAxis
+                tickFormatter={formatMillions}
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Legend wrapperStyle={{ paddingTop: 8 }} />
+              <Tooltip content={<GwpTooltip />} />
+              <Bar dataKey="quotation" name="Quotation GWP" radius={[10, 10, 0, 0]} barSize={30} />
+              <Bar dataKey="policies" name="Policies GWP" radius={[10, 10, 0, 0]} barSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </section>
 
-      <section className="two-col">
+      <section className="one-col">
         <ChartCard title="GWP by Business: Quotation vs Policies">
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpByBusinessQuotationVsPolicies} barGap={10}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Legend />
-              <Tooltip
-                formatter={(value, name) => [
-                  `SAR ${Number(value).toLocaleString()}`,
-                  name === 'quotation' ? 'Quotation GWP' : 'Policies GWP',
-                ]}
+          <ResponsiveContainer width="100%" height={340}>
+            <BarChart data={gwpByBusinessQuotationVsPolicies} barGap={10} barCategoryGap="22%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 12, fontWeight: 600 }}
+                axisLine={false}
+                tickLine={false}
               />
-              <Bar dataKey="quotation" name="Quotation GWP" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="policies" name="Policies GWP" radius={[8, 8, 0, 0]} />
+              <YAxis
+                tickFormatter={formatMillions}
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Legend wrapperStyle={{ paddingTop: 8 }} />
+              <Tooltip content={<GwpTooltip />} />
+              <Bar dataKey="quotation" name="Quotation GWP" radius={[10, 10, 0, 0]} barSize={30} />
+              <Bar dataKey="policies" name="Policies GWP" radius={[10, 10, 0, 0]} barSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
+      </section>
 
+      <section className="one-col">
         <ChartCard title="GWP by Source: Quotations vs Policies">
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={gwpBySourceQuotationVsPolicies} barGap={10}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Legend />
-              <Tooltip
-                formatter={(value, name) => [
-                  `SAR ${Number(value).toLocaleString()}`,
-                  name === 'quotation' ? 'Quotation GWP' : 'Policies GWP',
-                ]}
+          <ResponsiveContainer width="100%" height={380}>
+            <BarChart data={gwpBySourceQuotationVsPolicies} barGap={10} barCategoryGap="22%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis
+                dataKey="name"
+                interval={0}
+                angle={-25}
+                textAnchor="end"
+                height={80}
+                tickFormatter={formatSourceAxisLabel}
+                tick={{ fontSize: 12, fontWeight: 600 }}
+                axisLine={false}
+                tickLine={false}
               />
-              <Bar dataKey="quotation" name="Quotation GWP" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="policies" name="Policies GWP" radius={[8, 8, 0, 0]} />
+              <YAxis
+                tickFormatter={formatMillions}
+                tick={{ fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Legend wrapperStyle={{ paddingTop: 8 }} />
+              <Tooltip content={<GwpTooltip />} />
+              <Bar dataKey="quotation" name="Quotation GWP" radius={[10, 10, 0, 0]} barSize={30} />
+              <Bar dataKey="policies" name="Policies GWP" radius={[10, 10, 0, 0]} barSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
