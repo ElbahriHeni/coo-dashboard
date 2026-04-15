@@ -77,7 +77,8 @@ body {
 .page-nav-button,
 .primary-button,
 .secondary-button,
-.sheet-tab {
+.sheet-tab,
+.business-pill {
   border: 0;
   cursor: pointer;
   transition:
@@ -91,7 +92,8 @@ body {
 .page-nav-button:hover,
 .primary-button:hover,
 .secondary-button:hover,
-.sheet-tab:hover {
+.sheet-tab:hover,
+.business-pill:hover {
   transform: translateY(-1px);
 }
 
@@ -154,7 +156,7 @@ body {
 
 /* New dashboard filter bar */
 .filter-bar {
-  padding: 20px;
+  padding: 20px 22px;
   margin-bottom: 20px;
 }
 
@@ -203,14 +205,36 @@ body {
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
-.multi-select {
-  min-height: 120px !important;
-  padding-top: 8px !important;
-  padding-bottom: 8px !important;
+.business-pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 44px;
+  align-items: center;
+  padding: 2px 0;
 }
 
-.multi-select option {
-  padding: 8px 10px;
+.business-pill {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  min-height: 40px;
+}
+
+.business-pill:hover {
+  border-color: #94a3b8;
+}
+
+.business-pill.active {
+  background: #1d4ed8;
+  color: #ffffff;
+  border-color: #1d4ed8;
+  box-shadow: 0 8px 18px rgba(29, 78, 216, 0.18);
 }
 
 .filter-help {
@@ -488,7 +512,12 @@ body {
     padding: 16px;
   }
 
-  .multi-select {
-    min-height: 110px !important;
+  .business-pill-group {
+    gap: 8px;
+  }
+
+  .business-pill {
+    width: 100%;
+    justify-content: center;
   }
 }
