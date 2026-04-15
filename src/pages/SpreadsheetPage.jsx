@@ -6,10 +6,12 @@ import {
   normalizeHeader,
   OPPORTUNITY_COLUMNS,
   saveOpportunityImport,
+  getMappedBusinessFromUsrClass,
 } from '../utils/opportunityImport';
 
 const PAGE_SIZE = 200;
 const STATIC_WORKBOOK_URL = '/data/AllOppQDR.xlsx';
+const BUSINESS_MAPPING_COLUMN = 'Business Mapping';
 
 const formatFileSize = (size) => {
   if (size < 1024) return `${size} B`;
@@ -26,6 +28,11 @@ const formatCellValue = (value) => {
 const formatOpportunityCellValue = (header, value) => {
   if (header === 'UsrQuoteSubmissionDate') {
     return formatCellValue(normalizeDashboardDate(value));
+  }
+
+  if (header === BUSINESS_MAPPING_COLUMN) {
+    const mapping = getMappedBusinessFromUsrClass(value);
+    return mapping.display;
   }
 
   return formatCellValue(value);
@@ -245,7 +252,8 @@ export default function SpreadsheetPage() {
           <p className="eyebrow uploader-eyebrow">Excel Import</p>
           <h2>Load opportunities from XLSX</h2>
           <p className="subtitle uploader-subtitle">
-            This page now auto-loads the deployed workbook and maps it into the dashboard opportunity fields.
+            This page auto-loads the deployed workbook, maps it into the dashboard fields, and shows
+            a business mapping check based on UsrClass.
           </p>
         </div>
 
@@ -366,6 +374,7 @@ export default function SpreadsheetPage() {
                   {OPPORTUNITY_COLUMNS.map((header) => (
                     <th key={header}>{header}</th>
                   ))}
+                  <th>{BUSINESS_MAPPING_COLUMN}</th>
                 </tr>
               </thead>
               <tbody>
@@ -376,6 +385,9 @@ export default function SpreadsheetPage() {
                         {formatOpportunityCellValue(header, row[header])}
                       </td>
                     ))}
+                    <td key={`${BUSINESS_MAPPING_COLUMN}-${startRow + rowIndex}`}>
+                      {getMappedBusinessFromUsrClass(row.UsrClass).display}
+                    </td>
                   </tr>
                 ))}
               </tbody>
