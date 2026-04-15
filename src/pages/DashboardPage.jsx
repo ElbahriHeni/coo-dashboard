@@ -246,7 +246,15 @@ const TatTooltip = ({ active, payload, label }) => {
   if (!data) return null;
 
   return (
-    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
+    <div
+      style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 12,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
+      }}
+    >
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <div>Count: {data.count}</div>
       <div>Avg TAT Days: {data.avgDays}</div>
@@ -261,7 +269,15 @@ const ConversionRateTooltip = ({ active, payload, label }) => {
   if (!data) return null;
 
   return (
-    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
+    <div
+      style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 12,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
+      }}
+    >
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <div>Quotations: {data.quotations}</div>
       <div>Complete: {data.policies}</div>
@@ -276,7 +292,15 @@ const ActionPieTooltip = ({ active, payload }) => {
   if (!data) return null;
 
   return (
-    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }}>
+    <div
+      style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 12,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
+      }}
+    >
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{data.name}</div>
       <div>Count: {data.value}</div>
     </div>
@@ -695,48 +719,43 @@ export default function DashboardPage() {
         </ChartCard>
       </section>
 
-      <section className="two-col">
-        <ChartCard title="Classeur Actions">
-          <ResponsiveContainer width="100%" height={320}>
-            <PieChart>
-              <Pie
-                data={actionPieData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={110}
-                innerRadius={55}
-                paddingAngle={2}
-                label={({ name, percent }) =>
-                  percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''
-                }
-              >
-                {actionPieData.map((entry, index) => (
-                  <Cell key={entry.name} fill={ACTION_COLORS[index % ACTION_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip content={<ActionPieTooltip />} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartCard>
+      {actionPieData.length > 0 ? (
+        <section className="one-col">
+          <ChartCard title="Classeur Actions">
+            <ResponsiveContainer width="100%" height={340}>
+              <PieChart>
+                <Pie
+                  data={actionPieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={120}
+                  innerRadius={60}
+                  paddingAngle={3}
+                  label={({ name, percent }) =>
+                    percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''
+                  }
+                >
+                  {actionPieData.map((entry, index) => (
+                    <Cell key={entry.name} fill={ACTION_COLORS[index % ACTION_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ActionPieTooltip />} />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </section>
+      ) : null}
 
-        {classeurError ? (
-          <div className="card">
+      {classeurError ? (
+        <section className="one-col">
+          <div className="card" style={{ padding: 20 }}>
             <strong>{classeurError}</strong>
           </div>
-        ) : (
-          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Action Summary</div>
-              <div style={{ color: '#64748b' }}>
-                Showing Approve, Approve Conditionally, and Reject from filtered Classeur rows.
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <section className="three-col">
         <ChartCard title="Policies Converted by Duration">
