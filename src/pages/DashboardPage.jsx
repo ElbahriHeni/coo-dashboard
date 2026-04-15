@@ -9,6 +9,9 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 import KpiCard from '../components/KpiCard';
 import FilterBar from '../components/FilterBar';
@@ -52,6 +55,8 @@ const POLICY_GWP_STATUSES = new Set([
 
 const QUOTATION_TAT_GROUPS = ['Sales', 'UW', 'Reinsurance', 'Risk engineer', 'Doctor'];
 const POLICY_TAT_GROUPS = ['AML', 'Finance', 'PA'];
+
+const ACTION_COLORS = ['#2563eb', '#16a34a', '#dc2626'];
 
 function groupBy(recordsList, key, valueSelector) {
   return Object.entries(
@@ -159,6 +164,21 @@ const normalizeAssignedByRoleForPoliciesTat = (value) => {
   ) {
     return 'PA';
   }
+
+  return '';
+};
+
+const normalizeAction = (value) => {
+  const raw = String(value ?? '').trim().toLowerCase();
+
+  if (!raw) return '';
+
+  if (raw === 'approve' || raw.includes('approve')) {
+    if (raw.includes('conditional')) return 'Approve Conditionally';
+    return 'Approve';
+  }
+
+  if (raw.includes('reject')) return 'Reject';
 
   return '';
 };
@@ -310,6 +330,28 @@ const ConversionRateTooltip = ({ active, payload, label }) => {
       <div>Quotations: {data.quotations}</div>
       <div>Complete: {data.policies}</div>
       <div>Conversion Rate: {data.value}%</div>
+    </div>
+  );
+};
+
+const ActionPieTooltip = ({ active, payload }) => {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  return (
+    <div
+      style={{
+        background: 'white',
+        border: '1px solid #e2e8f0',
+        borderRadius: 12,
+        padding: 12,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.08)',
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>{data.name}</div>
+      <div>Count: {data.value}</div>
     </div>
   );
 };
@@ -488,6 +530,25 @@ export default function DashboardPage() {
 
   const policiesTatByDepartment = useMemo(() => {
     return buildPolicyTatDataset(filteredClasseurRows, POLICY_TAT_GROUPS);
+  }, [filteredClasseurRows]);
+
+  const actionPieData = useMemo(() => {
+    const grouped = filteredClasseurRows.reduce((acc, row) => {
+      const action = normalizeAction(row.UsrAction);
+      if (!action) return acc;
+      if (!acc[action]) acc[action] = 0;
+      acc[action] += 1;
+      return acc;
+    }, {});
+
+    const ordered = ['Approve', 'Approve Conditionally', 'Reject'];
+
+    return ordered
+      .filter((name) => grouped[name] > 0)
+      .map((name) => ({
+        name,
+        value: grouped[name],
+      }));
   }, [filteredClasseurRows]);
 
   const quotationsCount = useMemo(() => filteredImportedRows.length, [filteredImportedRows]);
@@ -764,13 +825,48 @@ export default function DashboardPage() {
         </ChartCard>
       </section>
 
-      {classeurError ? (
-        <section className="two-col">
+      <section className="two-col">
+        <ChartCard title="Classeur Actions">
+          <ResponsiveContainer width="100%" height={320}>
+            <PieChart>
+              <Pie
+                data={actionPieData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={110}
+                innerRadius={55}
+                paddingAngle={2}
+                label={({ name, percent }) =>
+                  percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''
+                }
+              >
+                {actionPieData.map((entry, index) => (
+                  <Cell key={entry.name} fill={ACTION_COLORS[index % ACTION_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ActionPieTooltip />} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {classeurError ? (
           <div className="card">
             <strong>{classeurError}</strong>
           </div>
-        </section>
-      ) : null}
+        ) : (
+          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Action Summary</div>
+              <div style={{ color: '#64748b' }}>
+                Showing Approve, Approve Conditionally, and Reject from filtered Classeur rows.
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       <section className="three-col">
         <ChartCard title="Policies Converted by Duration">
